@@ -52,11 +52,30 @@ def discover(timeout_s: float = 3.0) -> list[DiscoveredDevice]:
         xaddrs = list(svc.getXAddrs())
         if not xaddrs:
             continue
+        # Prefer an IPv4 xAddr over IPv6 / link-local. Dual-stack cameras
+        # advertise both; the IPv4 form is easier for humans to read and
+        # works on hosts without IPv6 routing.
+        xaddr = _prefer_ipv4(xaddrs)
         out.append(
             DiscoveredDevice(
-                address=xaddrs[0],
+                address=xaddr,
                 types=tuple(str(t) for t in svc.getTypes()),
                 scopes=tuple(str(s) for s in svc.getScopes()),
             )
         )
     return out
+
+
+def _prefer_ipv4(xaddrs: list[str]) -> str:
+    """Pick the xAddr whose host parses as an IPv4 address, else the first."""
+    import ipaddress
+    from urllib.parse import urlparse
+
+    for x in xaddrs:
+        try:
+            h = urlparse(x).hostname or ""
+            ipaddress.IPv4Address(h)
+            return x
+        except (ValueError, TypeError):
+            continue
+    return xaddrs[0]

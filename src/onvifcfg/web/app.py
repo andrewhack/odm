@@ -65,8 +65,9 @@ def create_app() -> FastAPI:
             try:
                 for d in _discover(timeout_s=timeout):
                     u = urlparse(d.best_xaddr())
+                    hostname = u.hostname or ""
                     devices.append({
-                        "host": u.hostname or "",
+                        "host": _to_ipv4(hostname),
                         "port": u.port or 80,
                         "xaddr": d.best_xaddr(),
                         "scopes": list(d.scopes),
@@ -279,3 +280,26 @@ def _csv_ips(v: str | None) -> tuple[IPv4Address, ...] | None:
 
 def _form_dump(**kwargs: Any) -> dict[str, Any]:
     return {k: ("" if v is None else v) for k, v in kwargs.items()}
+
+
+
+def _to_ipv4(host: str) -> str:
+    """Resolve a hostname to an IPv4 string, or return the input unchanged.
+
+    Already-IPv4 strings pass through. IPv6 literals / hostnames resolve via
+    socket.gethostbyname (A-record). Failures leave the original value so
+    the UI still shows something clickable.
+    """
+    import socket
+    if not host:
+        return host
+    try:
+        import ipaddress
+        ipaddress.IPv4Address(host)
+        return host
+    except ValueError:
+        pass
+    try:
+        return socket.gethostbyname(host)
+    except (socket.gaierror, socket.herror, OSError):
+        return host
