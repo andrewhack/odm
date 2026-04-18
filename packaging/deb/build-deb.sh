@@ -27,7 +27,7 @@ uv run pyinstaller \
     --clean \
     --noconfirm \
     --paths src \
-    --collect-all onvif \
+    --add-data "src/onvifcfg/web/templates:onvifcfg/web/templates"     --add-data "src/onvifcfg/web/static:onvifcfg/web/static"     --collect-all onvif \
     --collect-all wsdiscovery \
     --collect-all zeep \
     src/onvifcfg/__main__.py
