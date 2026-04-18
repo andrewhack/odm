@@ -35,6 +35,16 @@ templates = Jinja2Templates(directory=str(_here / "templates"))
 
 def create_app() -> FastAPI:
     app = FastAPI(title="onvifcfg", openapi_url=None, docs_url=None, redoc_url=None)
+
+    @app.exception_handler(Exception)
+    def _on_error(request, exc):  # type: ignore[no-untyped-def]
+        import traceback
+        tb = traceback.format_exc()
+        return HTMLResponse(
+            "<h2>onvifcfg internal error</h2><pre>" + tb.replace("<", "&lt;") + "</pre>",
+            status_code=500,
+        )
+
     app.mount(
         "/static",
         StaticFiles(directory=str(_here / "static")),
@@ -43,21 +53,15 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> Any:
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
 
     @app.post("/discover", response_class=HTMLResponse)
     def discover(request: Request, timeout: float = Form(3.0)) -> Any:
         try:
             devices = _discover(timeout_s=timeout)
         except Exception as e:
-            return templates.TemplateResponse(
-                "index.html",
-                {"request": request, "error": f"discovery failed: {e}"},
-            )
-        return templates.TemplateResponse(
-            "index.html",
-            {"request": request, "devices": devices},
-        )
+            return templates.TemplateResponse(request=request, name="index.html", context={"request": request, "error": f"discovery failed: {e}"})
+        return templates.TemplateResponse(request=request, name="index.html", context={"request": request, "devices": devices})
 
     @app.post("/device", response_class=HTMLResponse)
     def device(
@@ -71,21 +75,15 @@ def create_app() -> FastAPI:
             sess = DeviceSession(host, port, Credentials(user=user, password=password))
             state = read_state(sess)
         except OnvifcfgError as e:
-            return templates.TemplateResponse(
-                "index.html",
-                {"request": request, "error": f"session error: {e}"},
-            )
-        return templates.TemplateResponse(
-            "device.html",
-            {
+            return templates.TemplateResponse(request=request, name="index.html", context={"request": request, "error": f"session error: {e}"})
+        return templates.TemplateResponse(request=request, name="device.html", context={
                 "request": request,
                 "host": host,
                 "port": port,
                 "user": user,
                 "password": password,
                 "state": state,
-            },
-        )
+            })
 
     @app.post("/apply", response_class=HTMLResponse)
     def apply(
@@ -135,22 +133,16 @@ def create_app() -> FastAPI:
             sess = DeviceSession(host, port, Credentials(user=user, password=password))
             state = read_state(sess)
         except OnvifcfgError as e:
-            return templates.TemplateResponse(
-                "index.html",
-                {"request": request, "error": f"session error: {e}"},
-            )
+            return templates.TemplateResponse(request=request, name="index.html", context={"request": request, "error": f"session error: {e}"})
 
         diff = compute_diff(state, patch)
         if not diff.any:
-            return templates.TemplateResponse(
-                "result.html",
-                {
+            return templates.TemplateResponse(request=request, name="result.html", context={
                     "request": request,
                     "no_change": True,
                     "host": host,
                     "port": port,
-                },
-            )
+                })
 
         try:
             warnings = _validate(
@@ -159,9 +151,7 @@ def create_app() -> FastAPI:
                 client_ip=IPv4Address(client_ip) if client_ip else None,
             )
         except ValidationError as e:
-            return templates.TemplateResponse(
-                "device.html",
-                {
+            return templates.TemplateResponse(request=request, name="device.html", context={
                     "request": request,
                     "host": host,
                     "port": port,
@@ -169,13 +159,10 @@ def create_app() -> FastAPI:
                     "password": password,
                     "state": state,
                     "error": f"validation failed: {e}",
-                },
-            )
+                })
 
         if confirm != "yes":
-            return templates.TemplateResponse(
-                "confirm.html",
-                {
+            return templates.TemplateResponse(request=request, name="confirm.html", context={
                     "request": request,
                     "host": host,
                     "port": port,
@@ -195,26 +182,19 @@ def create_app() -> FastAPI:
                         discovery_mode=discovery_mode, client_ip=client_ip,
                         dhcp=dhcp,
                     ),
-                },
-            )
+                })
 
         try:
             result = _apply(sess, state, patch, new_host_port=port)
         except OnvifcfgError as e:
-            return templates.TemplateResponse(
-                "result.html",
-                {"request": request, "error": f"apply failed: {e}", "host": host, "port": port},
-            )
+            return templates.TemplateResponse(request=request, name="result.html", context={"request": request, "error": f"apply failed: {e}", "host": host, "port": port})
 
-        return templates.TemplateResponse(
-            "result.html",
-            {
+        return templates.TemplateResponse(request=request, name="result.html", context={
                 "request": request,
                 "host": host,
                 "port": port,
                 "result": result,
-            },
-        )
+            })
 
     return app
 
