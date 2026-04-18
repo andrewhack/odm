@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}onvifcfg — {{ host }}{% endblock %}
+{% block content %}
+
+{% set nic = state.primary_interface %}
+<h2>{{ host }}:{{ port }} <span class="muted">({{ state.hostname.name or "no hostname" }})</span></h2>
+
+<h3>current state</h3>
+<table>
+  <tbody>
+    <tr><th>hostname</th><td>{{ state.hostname.name }} <span class="muted">(fromDHCP={{ state.hostname.from_dhcp }})</span></td></tr>
+    {% if nic and nic.ipv4 %}
+    <tr><th>interface</th><td>{{ nic.token }} <span class="muted">mac={{ nic.mac }} enabled={{ nic.enabled }}</span></td></tr>
+    <tr><th>dhcp</th><td>{{ nic.ipv4.dhcp }}</td></tr>
+    <tr><th>ip</th><td>{{ nic.ipv4.address }}/{{ nic.ipv4.prefix_length }} <span class="muted">({{ nic.ipv4.subnet_mask }})</span></td></tr>
+    {% endif %}
+    <tr><th>gateway</th><td>v4={{ state.gateway.ipv4|join(', ') }} v6={{ state.gateway.ipv6|join(', ') }}</td></tr>
+    <tr><th>dns</th><td>fromDHCP={{ state.dns.from_dhcp }} servers={{ state.dns.servers|join(', ') }} search={{ state.dns.search_domains|join(', ') }}</td></tr>
+    {% if state.ntp %}
+    <tr><th>ntp</th><td>fromDHCP={{ state.ntp.from_dhcp }} servers={{ state.ntp.servers|join(', ') }}</td></tr>
+    {% endif %}
+    {% for p in state.protocols %}
+    <tr><th>proto:{{ p.name.value.lower() }}</th><td>enabled={{ p.enabled }} ports={{ p.port|join(', ') }}</td></tr>
+    {% endfor %}
+    {% if state.zero_config %}
+    <tr><th>zero-config</th><td>supported={{ state.zero_config.supported }} enabled={{ state.zero_config.enabled }}</td></tr>
+    {% endif %}
+    {% if state.discovery_mode %}
+    <tr><th>discovery-mode</th><td>{{ state.discovery_mode.value }}</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:2em">apply changes</h3>
+<form method="post" action="/apply">
+  <input type="hidden" name="host" value="{{ host }}">
+  <input type="hidden" name="port" value="{{ port }}">
+  <input type="hidden" name="user" value="{{ user }}">
+  <input type="hidden" name="password" value="{{ password }}">
+
+  <fieldset>
+    <legend>IP / subnet</legend>
+    <div class="row"><label>dhcp</label>
+      <select name="dhcp">
+        <option value="">(no change)</option>
+        <option value="true">yes</option>
+        <option value="false">no</option>
+      </select>
+    </div>
+    <div class="row"><label>ip</label><input type="text" name="ip" placeholder="{{ nic.ipv4.address if nic and nic.ipv4 else '' }}"></div>
+    <div class="row"><label>subnet mask</label><input type="text" name="subnet" placeholder="255.255.255.0"></div>
+    <div class="row"><label>gateway</label><input type="text" name="gateway" placeholder="192.168.1.1 (semicolon-sep for multi)"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>DNS / NTP</legend>
+    <div class="row"><label>dns servers</label><input type="text" name="dns" placeholder="8.8.8.8; 1.1.1.1"></div>
+    <div class="row"><label>ntp servers</label><input type="text" name="ntp" placeholder="pool.ntp.org"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>hostname</legend>
+    <div class="row"><label>hostname</label><input type="text" name="hostname"></div>
+    <div class="row"><label>from DHCP</label>
+      <select name="hostname_from_dhcp">
+        <option value="">(no change)</option>
+        <option value="true">yes</option>
+        <option value="false">no</option>
+      </select>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>protocols</legend>
+    <div class="row"><label>HTTP port</label><input type="number" name="http_port" min="1" max="65535"></div>
+    <div class="row"><label>HTTP enabled</label>
+      <select name="http_enabled"><option value="">(no change)</option><option value="true">yes</option><option value="false">no</option></select>
+    </div>
+    <div class="row"><label>HTTPS port</label><input type="number" name="https_port" min="1" max="65535"></div>
+    <div class="row"><label>HTTPS enabled</label>
+      <select name="https_enabled"><option value="">(no change)</option><option value="true">yes</option><option value="false">no</option></select>
+    </div>
+    <div class="row"><label>RTSP port</label><input type="number" name="rtsp_port" min="1" max="65535"></div>
+    <div class="row"><label>RTSP enabled</label>
+      <select name="rtsp_enabled"><option value="">(no change)</option><option value="true">yes</option><option value="false">no</option></select>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>misc</legend>
+    <div class="row"><label>zero-config</label>
+      <select name="zero_config_enabled"><option value="">(no change)</option><option value="true">yes</option><option value="false">no</option></select>
+    </div>
+    <div class="row"><label>discovery mode</label>
+      <select name="discovery_mode">
+        <option value="">(no change)</option>
+        <option value="Discoverable">Discoverable</option>
+        <option value="NonDiscoverable">NonDiscoverable</option>
+      </select>
+    </div>
+    <div class="row"><label>your PC IP</label><input type="text" name="client_ip" placeholder="optional - enables reachability warning"></div>
+  </fieldset>
+
+  <button type="submit">preview changes</button>
+</form>
+
+{% endblock %}

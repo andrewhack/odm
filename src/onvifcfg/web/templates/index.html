@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>discover cameras</h2>
+<form method="post" action="/discover">
+  <div class="row">
+    <label for="timeout">probe timeout (s)</label>
+    <input type="number" id="timeout" name="timeout" value="3" min="1" max="30" step="0.5">
+    <button type="submit">discover</button>
+  </div>
+</form>
+
+{% if devices is defined %}
+  {% if devices %}
+    <h3>found {{ devices|length }} device(s)</h3>
+    <table>
+      <thead><tr><th>address</th><th>scopes</th></tr></thead>
+      <tbody>
+        {% for d in devices %}
+          <tr>
+            <td><code>{{ d.best_xaddr() }}</code></td>
+            <td class="muted">{{ d.scopes|join(' ') }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="warn">no ONVIF devices found - check network reachability or switch subnet</div>
+  {% endif %}
+{% endif %}
+
+<h2 style="margin-top:2em">connect to a camera</h2>
+<form method="post" action="/device">
+  <fieldset>
+    <legend>device</legend>
+    <div class="row"><label>host</label><input type="text" name="host" required placeholder="192.168.1.100"></div>
+    <div class="row"><label>port</label><input type="number" name="port" value="80" min="1" max="65535"></div>
+    <div class="row"><label>user</label><input type="text" name="user" required></div>
+    <div class="row"><label>password</label><input type="password" name="password" required></div>
+  </fieldset>
+  <button type="submit">open</button>
+</form>
+
+{% endblock %}

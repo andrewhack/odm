@@ -1,9 +1,15 @@
 # onvifcfg — ONVIF network configuration tool
 
-Cross-platform command-line tool for configuring ONVIF-compliant IP cameras.
-Focused on the **network configuration** workflow (IP address, DNS, NTP,
-gateway, hostname, discovery protocols) with reliability and compatibility
-fixes derived from a prior analysis of the upstream ONVIF Device Manager.
+Cross-platform ONVIF IP camera configuration tool.  Same feature scope as
+the upstream ONVIF Device Manager — network configuration, device info,
+user management, PTZ, live video preview — delivered as both a CLI
+(`onvifcfg`) and a local browser UI (`onvifcfg serve` → localhost:8080).
+The rewrite ships every reliability and compatibility fix identified in
+the prior review of the legacy ODM source.
+
+**Status**: Phase 1 (discovery + network configuration) shipped.  Phases
+2–7 (device info, users, imaging, video encoder, live preview, PTZ,
+events, certificates) tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Lineage
 
@@ -52,12 +58,20 @@ uv sync
 uv run onvifcfg --help
 ```
 
-Per-platform packaged installs:
+## Linux (Debian / Ubuntu)
 
-- **Linux (Debian/Ubuntu .deb)**: switch to branch `linux`, see its README
-- **Windows (MSI)**: switch to branch `windows-msi`, see its README
+This branch produces a self-contained `.deb` — PyInstaller bundle + nfpm
+packaging. See [packaging/deb/README.md](packaging/deb/README.md) for
+build host requirements and the build command:
 
-## Usage
+```bash
+bash packaging/deb/build-deb.sh
+```
+
+Install with `sudo apt install ./dist/onvifcfg_*_amd64.deb`. The resulting
+binary ships its own Python runtime; no system Python dependency.
+
+## Usage — CLI
 
 ```bash
 # discover cameras on the local subnet
@@ -73,6 +87,17 @@ onvifcfg apply 192.168.1.100 --user admin --password secret \
 # change only the RTSP port
 onvifcfg apply 192.168.1.100 -u admin -p secret --rtsp 8554
 ```
+
+## Usage — web UI
+
+```bash
+onvifcfg serve            # binds 127.0.0.1:8080 by default
+# then open http://localhost:8080/ in any browser
+```
+
+The web UI exposes the same discover / read / apply flow with a click-
+through confirmation page.  Do **not** expose it on a network — it
+reconfigures cameras and has no built-in access control.
 
 ## Layout
 

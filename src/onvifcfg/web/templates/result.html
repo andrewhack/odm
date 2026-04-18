@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}onvifcfg — result{% endblock %}
+{% block content %}
+
+{% if no_change %}
+  <div class="ok">no effective changes - nothing to apply.</div>
+{% elif result %}
+  {% if result.reboot_issued %}
+    {% if result.reconnected %}
+      <div class="ok">applied. device rebooted and is answering on {{ result.new_host }}:{{ port }}.</div>
+    {% else %}
+      <div class="warn">applied. reboot requested but the device did not answer on {{ result.new_host }}:{{ port }} within the window - check cabling / subnet reachability.</div>
+    {% endif %}
+  {% else %}
+    <div class="ok">applied. no reboot required.</div>
+  {% endif %}
+{% endif %}
+
+<p><a href="/">back to start</a></p>
+
+{% endblock %}

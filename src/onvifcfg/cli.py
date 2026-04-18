@@ -49,6 +49,21 @@ def version() -> None:
 
 
 @app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address. Stay on localhost unless you know what you're doing."),
+    port: int = typer.Option(8080, "--port", "-P"),
+) -> None:
+    """Launch the local web UI (FastAPI + Jinja)."""
+    import uvicorn
+
+    from .web.app import create_app
+
+    app_ = create_app()
+    console.print(f"[green]onvifcfg web UI on http://{host}:{port}/[/]")
+    uvicorn.run(app_, host=host, port=port, log_level="warning")
+
+
+@app.command()
 def discover(
     timeout: float = typer.Option(3.0, "--timeout", "-t", help="Probe timeout in seconds."),
 ) -> None:

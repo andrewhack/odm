@@ -1,0 +1,75 @@
+:root {
+  --fg: #1a1a1a;
+  --bg: #fafafa;
+  --muted: #666;
+  --accent: #0062b1;
+  --warn: #c46a00;
+  --err: #b00020;
+  --line: #ddd;
+  --panel: #fff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+header {
+  padding: 12px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+header h1 { margin: 0; font-size: 1.25rem; }
+header h1 a { color: var(--fg); text-decoration: none; }
+header nav { color: var(--muted); }
+
+main { padding: 24px; max-width: 900px; }
+footer { padding: 16px 24px; color: var(--muted); border-top: 1px solid var(--line); background: var(--panel); }
+
+h2 { margin-top: 0; }
+h3 { margin-top: 1.5em; }
+
+form { margin: 0; }
+fieldset { border: 1px solid var(--line); border-radius: 4px; padding: 12px 16px; margin-bottom: 16px; background: var(--panel); }
+legend { padding: 0 6px; color: var(--muted); }
+label { display: inline-block; min-width: 140px; }
+input[type=text], input[type=password], input[type=number] {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font: inherit;
+  min-width: 200px;
+}
+input[readonly] { background: #eee; color: var(--muted); }
+
+button {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+  cursor: pointer;
+}
+button.secondary { background: var(--muted); }
+button.danger { background: var(--err); }
+
+table { width: 100%; border-collapse: collapse; background: var(--panel); }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: normal; font-size: 0.9em; }
+
+.error { background: #fee; color: var(--err); border: 1px solid var(--err); padding: 10px; border-radius: 4px; margin-bottom: 16px; }
+.warn  { background: #fff6e6; color: var(--warn); border: 1px solid var(--warn); padding: 10px; border-radius: 4px; margin-bottom: 8px; }
+.ok    { background: #e6f7ed; color: #1a6b3d; border: 1px solid #3a8; padding: 10px; border-radius: 4px; margin-bottom: 16px; }
+
+.row { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+.muted { color: var(--muted); font-size: 0.9em; }
+
+pre { background: #111; color: #eee; padding: 10px; border-radius: 4px; overflow: auto; }

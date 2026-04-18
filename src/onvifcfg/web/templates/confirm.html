@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}onvifcfg — confirm apply{% endblock %}
+{% block content %}
+
+<h2>confirm changes for {{ host }}:{{ port }}</h2>
+
+{% if warnings %}
+  {% for w in warnings %}
+    <div class="warn">{{ w.message }}</div>
+  {% endfor %}
+{% endif %}
+
+<h3>diff</h3>
+<table>
+  <thead><tr><th>field</th><th>current</th><th>new</th></tr></thead>
+  <tbody>
+    {% set nic = state.primary_interface %}
+    {% if diff.dhcp_changed %}<tr><td>dhcp</td><td>{{ nic.ipv4.dhcp if nic and nic.ipv4 }}</td><td>{{ patch.dhcp }}</td></tr>{% endif %}
+    {% if diff.ip_changed %}<tr><td>ip</td><td>{{ nic.ipv4.address if nic and nic.ipv4 }}</td><td>{{ patch.ip }}</td></tr>{% endif %}
+    {% if diff.subnet_changed %}<tr><td>subnet</td><td>{{ nic.ipv4.subnet_mask if nic and nic.ipv4 }}</td><td>{{ patch.subnet_mask }}</td></tr>{% endif %}
+    {% if diff.gateway_changed %}<tr><td>gateway</td><td>{{ (state.gateway.ipv4 + state.gateway.ipv6)|join(', ') }}</td><td>{{ (patch.gateway or ())|join(', ') }}</td></tr>{% endif %}
+    {% if diff.dns_changed %}<tr><td>dns</td><td>{{ state.dns.servers|join(', ') }}</td><td>{{ (patch.dns or ())|join(', ') }}</td></tr>{% endif %}
+    {% if diff.ntp_changed %}<tr><td>ntp</td><td>{{ state.ntp.servers|join(', ') if state.ntp }}</td><td>{{ (patch.ntp_servers or ())|join(', ') }}</td></tr>{% endif %}
+    {% if diff.hostname_changed %}<tr><td>hostname</td><td>{{ state.hostname.name }} (fromDHCP={{ state.hostname.from_dhcp }})</td><td>{{ patch.hostname or state.hostname.name }} (fromDHCP={{ patch.use_hostname_from_dhcp if patch.use_hostname_from_dhcp is not none else state.hostname.from_dhcp }})</td></tr>{% endif %}
+    {% for proto in diff.protocols_changed %}<tr><td>proto:{{ proto.value.lower() }}</td><td colspan="2">changed</td></tr>{% endfor %}
+    {% if diff.zero_config_changed %}<tr><td>zero-config</td><td>{{ state.zero_config.enabled if state.zero_config }}</td><td>{{ patch.zero_config_enabled }}</td></tr>{% endif %}
+    {% if diff.discovery_mode_changed %}<tr><td>discovery-mode</td><td>{{ state.discovery_mode.value if state.discovery_mode }}</td><td>{{ patch.discovery_mode.value if patch.discovery_mode }}</td></tr>{% endif %}
+  </tbody>
+</table>
+
+<form method="post" action="/apply" style="margin-top:1em">
+  {% for k, v in form_values.items() %}
+    <input type="hidden" name="{{ k }}" value="{{ v }}">
+  {% endfor %}
+  <input type="hidden" name="host" value="{{ host }}">
+  <input type="hidden" name="port" value="{{ port }}">
+  <input type="hidden" name="user" value="{{ user }}">
+  <input type="hidden" name="password" value="{{ password }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button type="submit" class="danger">apply these changes</button>
+  <a href="/" style="margin-left:10px">cancel</a>
+</form>
+
+{% endblock %}
