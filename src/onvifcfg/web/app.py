@@ -64,6 +64,7 @@ def create_app() -> FastAPI:
                         "name": _reverse_dns(ip) or "",
                         "port": u.port or 80,
                         "xaddr": d.best_xaddr(),
+                        "authed": _creds.known(ip),
                     })
             except Exception as e:
                 error = f"discovery failed: {e}"
@@ -108,8 +109,19 @@ def create_app() -> FastAPI:
     ) -> Any:
         try:
             sess = DeviceSession(host, port, Credentials(user=user, password=password))
-            state = read_state(sess)
         except OnvifcfgError as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="index.html",
+                context={"request": request, "error": f"session error: {e}", "devices": [], "timeout": 3.0},
+            )
+        # Session constructor succeeded - but read_state makes the first
+        # real SOAP call which can still raise an auth fault.  If the auth
+        # survives that first call, remember the creds even if something
+        # further along fails, so a retry can pick them up from the cache.
+        try:
+            state = read_state(sess)
+        except Exception as e:
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
@@ -237,6 +249,13 @@ def create_app() -> FastAPI:
 
     @app.get("/snapshot/{host}.jpg")
     def snapshot(host: str, port: int = 80) -> Response:
+        import sys
+        cands = _creds.candidates(host)
+        print(
+            f"[snapshot {host}:{port}] trying {len(cands)} candidate(s): "
+            + ", ".join(u or "(anon)" for u, _ in cands),
+            file=sys.stderr, flush=True,
+        )
         """JPEG snapshot using cached credentials with auth + no-auth fallback.
 
         For each (user, password) candidate in the cache:
@@ -253,7 +272,7 @@ def create_app() -> FastAPI:
         import logging, urllib.error, urllib.request
         log = logging.getLogger("onvifcfg.snapshot")
         attempts: list[str] = []
-        for user, password in _creds.candidates(host):
+        for user, password in cands:
             label = user or "(anon)"
             try:
                 sess = DeviceSession(host, port, Credentials(user=user, password=password))
@@ -296,10 +315,8 @@ def create_app() -> FastAPI:
                 except Exception as e:
                     attempts.append(f"{label}/{mode}: {e}")
                     break
-        import sys
-        print(f"[snapshot {host}:{port}] 404 - {len(attempts)} attempt(s):", file=sys.stderr, flush=True)
         for a in attempts:
-            print(f"    {a}", file=sys.stderr, flush=True)
+            log.info("snapshot %s: %s", host, a)
         return Response(status_code=404, content=b"", media_type="image/jpeg")
 
     return app

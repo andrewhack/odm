@@ -58,8 +58,9 @@ def _save(data: dict[str, list[list[str]]]) -> None:
         tmp = p.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
         tmp.replace(p)
-    except OSError:
-        pass  # non-fatal - cache is best-effort
+    except OSError as e:
+        import sys
+        print(f"[creds-cache] save failed to {p}: {e}", file=sys.stderr, flush=True)
 
 
 def remember(host: str, user: str, password: str) -> None:
@@ -72,6 +73,11 @@ def remember(host: str, user: str, password: str) -> None:
         entries.insert(0, pair)
         data[host] = entries[:10]
         _save(data)
+    import sys
+    print(
+        f"[creds-cache] remember host={host} user={user or '(anon)'} (cache at {_cache_path()})",
+        file=sys.stderr, flush=True,
+    )
 
 
 def candidates(host: str) -> list[tuple[str, str]]:
@@ -114,3 +120,17 @@ def forget(host: str | None = None) -> None:
         else:
             data.pop(host, None)
         _save(data)
+
+
+
+def known(host: str) -> bool:
+    """True if any non-default (user, password) has ever been saved for ``host``.
+
+    The two blank-password defaults (admin/"", ""/"") don't count - they are
+    always in ``candidates`` regardless of whether the user authenticated.
+    """
+    entries = _load().get(host, [])
+    for u, pw in entries:
+        if pw or (u and u != "admin"):
+            return True
+    return False
