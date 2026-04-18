@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}onvifcfg — connect {{ host }}{% endblock %}
+{% block content %}
+
+<h2>connect to {{ host }}:{{ port }}</h2>
+
+<form method="post" action="/device">
+  <fieldset>
+    <legend>credentials</legend>
+    <input type="hidden" name="host" value="{{ host }}">
+    <div class="row"><label>host</label><input type="text" name="host_display" value="{{ host }}" readonly></div>
+    <div class="row"><label>port</label><input type="number" name="port" value="{{ port }}" min="1" max="65535"></div>
+    <div class="row"><label>user</label><input type="text" name="user" required autofocus></div>
+    <div class="row"><label>password</label><input type="password" name="password" required></div>
+  </fieldset>
+  <button type="submit">open &rarr;</button>
+  <a href="/?no_discover=1" style="margin-left:10px">back</a>
+</form>
+
+{% endblock %}

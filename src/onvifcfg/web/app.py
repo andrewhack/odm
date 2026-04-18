@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from ipaddress import IPv4Address, ip_address
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any
 
 from fastapi import FastAPI, Form, Request
@@ -52,16 +53,40 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request) -> Any:
-        return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
+    def index(request: Request, timeout: float = 3.0, no_discover: bool = False) -> Any:
+        """Landing page - runs WS-Discovery on load and lists cameras as links.
 
-    @app.post("/discover", response_class=HTMLResponse)
-    def discover(request: Request, timeout: float = Form(3.0)) -> Any:
-        try:
-            devices = _discover(timeout_s=timeout)
-        except Exception as e:
-            return templates.TemplateResponse(request=request, name="index.html", context={"request": request, "error": f"discovery failed: {e}"})
-        return templates.TemplateResponse(request=request, name="index.html", context={"request": request, "devices": devices})
+        Pass ?no_discover=1 to skip discovery (useful for fast page reloads);
+        pass ?timeout=<s> to tune the probe window.
+        """
+        devices: list[dict] = []
+        error: str | None = None
+        if not no_discover:
+            try:
+                for d in _discover(timeout_s=timeout):
+                    u = urlparse(d.best_xaddr())
+                    devices.append({
+                        "host": u.hostname or "",
+                        "port": u.port or 80,
+                        "xaddr": d.best_xaddr(),
+                        "scopes": list(d.scopes),
+                    })
+            except Exception as e:
+                error = f"discovery failed: {e}"
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={"request": request, "devices": devices, "error": error, "timeout": timeout},
+        )
+
+    @app.get("/connect", response_class=HTMLResponse)
+    def connect_form(request: Request, host: str = "", port: int = 80) -> Any:
+        """Login form prefilled from a discovered device link."""
+        return templates.TemplateResponse(
+            request=request,
+            name="connect.html",
+            context={"request": request, "host": host, "port": port},
+        )
 
     @app.post("/device", response_class=HTMLResponse)
     def device(
