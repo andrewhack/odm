@@ -296,8 +296,10 @@ def create_app() -> FastAPI:
                 except Exception as e:
                     attempts.append(f"{label}/{mode}: {e}")
                     break
+        import sys
+        print(f"[snapshot {host}:{port}] 404 - {len(attempts)} attempt(s):", file=sys.stderr, flush=True)
         for a in attempts:
-            log.info("snapshot %s: %s", host, a)
+            print(f"    {a}", file=sys.stderr, flush=True)
         return Response(status_code=404, content=b"", media_type="image/jpeg")
 
     return app
