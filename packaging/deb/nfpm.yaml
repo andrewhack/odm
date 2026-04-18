@@ -1,0 +1,33 @@
+name: onvifcfg
+arch: amd64
+platform: linux
+version: "0.1.0"
+section: net
+priority: optional
+maintainer: onvifcfg contributors <noreply@example.invalid>
+description: |
+  ONVIF network configuration CLI. Discover cameras on the local subnet
+  and apply validated network configuration changes (IP, DNS, NTP,
+  gateway, hostname, HTTP/HTTPS/RTSP ports) with reliability fixes
+  carried over from a review of the upstream ONVIF Device Manager.
+vendor: onvifcfg contributors
+homepage: https://github.com/andrewhack/odm
+license: BSD-3-Clause
+
+depends:
+  - libc6
+
+contents:
+  - src: ./dist/onvifcfg
+    dst: /usr/bin/onvifcfg
+    file_info:
+      mode: 0755
+
+  - src: ./packaging/deb/copyright
+    dst: /usr/share/doc/onvifcfg/copyright
+
+  - src: ./README.md
+    dst: /usr/share/doc/onvifcfg/README
+
+  - src: ./docs/RELIABILITY_FIXES.md
+    dst: /usr/share/doc/onvifcfg/RELIABILITY_FIXES.md
