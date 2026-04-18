@@ -20,6 +20,13 @@ rm -rf dist build
 echo ">>> installing deps"
 uv sync --extra build
 
+echo ">>> resolving onvif WSDL directory"
+WSDL_DIR="$(uv run python -c 'import os, onvif; print(os.path.join(os.path.dirname(onvif.__file__), "wsdl"))')"
+if [ ! -d "$WSDL_DIR" ]; then
+    echo "ERROR: onvif wsdl directory not found at: $WSDL_DIR"; exit 2
+fi
+echo "    $WSDL_DIR"
+
 echo ">>> pyinstaller bundle"
 uv run pyinstaller \
     --name onvifcfg \
@@ -27,7 +34,10 @@ uv run pyinstaller \
     --clean \
     --noconfirm \
     --paths src \
-    --add-data "src/onvifcfg/web/templates:onvifcfg/web/templates"     --add-data "src/onvifcfg/web/static:onvifcfg/web/static"     --collect-all onvif \
+    --add-data "${WSDL_DIR}:onvif/wsdl" \
+    --add-data "src/onvifcfg/web/templates:onvifcfg/web/templates" \
+    --add-data "src/onvifcfg/web/static:onvifcfg/web/static" \
+    --collect-all onvif \
     --collect-all wsdiscovery \
     --collect-all zeep \
     src/onvifcfg/__main__.py
