@@ -21,9 +21,23 @@ echo ">>> installing deps"
 uv sync --extra build
 
 echo ">>> resolving onvif WSDL directory"
-WSDL_DIR="$(uv run python -c 'import os, onvif; print(os.path.join(os.path.dirname(onvif.__file__), "wsdl"))')"
-if [ ! -d "$WSDL_DIR" ]; then
-    echo "ERROR: onvif wsdl directory not found at: $WSDL_DIR"; exit 2
+# Look for the dir that actually contains devicemgmt.wsdl - onvif-zeep's
+# package layout has moved around between versions (sometimes onvif/wsdl,
+# sometimes onvif/zeep/wsdl, sometimes via pkg_resources).
+WSDL_DIR="$(uv run python -c '
+from pathlib import Path
+import onvif, sys
+for p in Path(onvif.__file__).parent.rglob("devicemgmt.wsdl"):
+    print(p.parent); sys.exit(0)
+# try site-packages root as a fallback
+root = Path(onvif.__file__).parent.parent
+for p in root.rglob("devicemgmt.wsdl"):
+    print(p.parent); sys.exit(0)
+')"
+if [ -z "$WSDL_DIR" ] || [ ! -d "$WSDL_DIR" ]; then
+    echo "ERROR: could not locate onvif wsdl directory"
+    uv run python -c "import onvif, os; print('onvif path:', onvif.__file__); print(os.listdir(os.path.dirname(onvif.__file__)))"
+    exit 2
 fi
 echo "    $WSDL_DIR"
 
