@@ -1,9 +1,12 @@
-"""PyInstaller entry point.
+"""Entry point for both `python -m onvifcfg` and the PyInstaller bundle.
 
-`python -m onvifcfg ...` and the bundled `onvifcfg` binary both land here.
+Absolute import on purpose: PyInstaller runs this file directly as
+``__main__`` without any parent package, so a relative ``from .cli``
+would fail with ``ImportError: attempted relative import with no known
+parent package``.
 """
 
-from .cli import app
+from onvifcfg.cli import app
 
 
 def main() -> None:
