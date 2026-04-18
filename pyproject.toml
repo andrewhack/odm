@@ -37,9 +37,6 @@ onvifcfg = "onvifcfg.cli:app"
 [project.optional-dependencies]
 build = ["pyinstaller>=6.6"]
 
-[project.optional-dependencies]
-build = ["pyinstaller>=6.6"]
-
 [project.urls]
 Homepage = "https://github.com/andrewhack/odm"
 Repository = "https://github.com/andrewhack/odm"
