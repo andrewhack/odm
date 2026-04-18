@@ -5,6 +5,10 @@
 {% set nic = state.primary_interface %}
 <h2>{{ host }}:{{ port }} <span class="muted">({{ state.hostname.name or "no hostname" }})</span></h2>
 
+{% if auto_login_note %}
+  <div class="ok" style="padding:6px 10px">{{ auto_login_note }}</div>
+{% endif %}
+
 <h3>current state</h3>
 <table>
   <tbody>

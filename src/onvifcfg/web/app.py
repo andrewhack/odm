@@ -81,11 +81,41 @@ def create_app() -> FastAPI:
 
     @app.get("/connect", response_class=HTMLResponse)
     def connect_form(request: Request, host: str = "", port: int = 80) -> Any:
-        """Login form prefilled from a discovered device link."""
+        """Auto-login with a blank password; fall back to the form on failure.
+
+        Many ONVIF cameras ship with a factory-default admin account and no
+        password. Trying it first saves a click on fresh-out-of-the-box
+        devices. We also try fully-anonymous (empty user + empty password)
+        for the handful of firmwares that allow unauthenticated ONVIF access.
+        """
+        for user, password in [("admin", ""), ("", "")]:
+            try:
+                sess = DeviceSession(host, port, Credentials(user=user, password=password))
+                state = read_state(sess)
+            except Exception:
+                continue
+            return templates.TemplateResponse(
+                request=request,
+                name="device.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "user": user,
+                    "password": password,
+                    "state": state,
+                    "auto_login_note": f"auto-logged in as '{user or '(anonymous)'}'",
+                },
+            )
         return templates.TemplateResponse(
             request=request,
             name="connect.html",
-            context={"request": request, "host": host, "port": port},
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "auto_failed": True,
+            },
         )
 
     @app.post("/device", response_class=HTMLResponse)

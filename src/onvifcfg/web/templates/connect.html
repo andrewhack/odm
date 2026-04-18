@@ -4,6 +4,10 @@
 
 <h2>connect to {{ host }}:{{ port }}</h2>
 
+{% if auto_failed %}
+  <div class="warn">no-password login failed &mdash; enter credentials below.</div>
+{% endif %}
+
 <form method="post" action="/device">
   <fieldset>
     <legend>credentials</legend>
