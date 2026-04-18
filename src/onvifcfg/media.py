@@ -84,11 +84,21 @@ def get_stream_uri(
 
 
 def get_snapshot_uri(sess: DeviceSession, profile_token: str) -> str | None:
+    """Return the HTTP snapshot URI for a profile, or None if the device
+    does not expose one (not every vendor implements GetSnapshotUri even
+    when it implements GetStreamUri).
+    """
+    import logging
+    log = logging.getLogger(__name__)
     try:
         resp = sess.media.GetSnapshotUri(ProfileToken=profile_token)
-    except Exception:
+    except Exception as e:
+        log.info("GetSnapshotUri failed: %s", e)
         return None
-    return str(resp.Uri) if resp is not None else None
+    if resp is None:
+        return None
+    uri = getattr(resp, "Uri", None) or str(resp)
+    return str(uri) if uri else None
 
 
 def uri_with_credentials(uri: str, user: str, password: str) -> str:

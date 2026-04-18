@@ -237,30 +237,68 @@ def create_app() -> FastAPI:
 
     @app.get("/snapshot/{host}.jpg")
     def snapshot(host: str, port: int = 80) -> Response:
-        """JPEG snapshot using any cached credentials, 404 if none work."""
-        import urllib.request
+        """JPEG snapshot using cached credentials with auth + no-auth fallback.
+
+        For each (user, password) candidate in the cache:
+          1. Open an ONVIF session with those creds.
+          2. Get the first profile's snapshot URI.
+          3. Fetch the URI with digest/basic auth configured.
+          4. If that returns 401, retry without any auth (many cameras
+             serve snapshots anonymously on HTTP even when ONVIF is
+             locked down).
+          5. If the HTTP fetch still fails, try the RTSP fallback below.
+        On every failure, log the reason so "onvifcfg serve" console
+        shows why a given camera has no preview.
+        """
+        import logging, urllib.error, urllib.request
+        log = logging.getLogger("onvifcfg.snapshot")
+        attempts: list[str] = []
         for user, password in _creds.candidates(host):
+            label = user or "(anon)"
             try:
                 sess = DeviceSession(host, port, Credentials(user=user, password=password))
                 profs = _media.get_profiles(sess)
-                if not profs:
-                    continue
-                uri = _media.get_snapshot_uri(sess, profs[0].token)
-                if not uri:
-                    continue
-                pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-                pm.add_password(None, uri, user, password or "")
-                opener = urllib.request.build_opener(
-                    urllib.request.HTTPBasicAuthHandler(pm),
-                    urllib.request.HTTPDigestAuthHandler(pm),
-                )
-                with opener.open(uri, timeout=6) as r:
-                    data = r.read()
-                _creds.remember(host, user, password)
-                return Response(content=data, media_type="image/jpeg")
-            except Exception:
+            except Exception as e:
+                attempts.append(f"{label}: session/profiles failed ({e})")
                 continue
-        return Response(status_code=404)
+            if not profs:
+                attempts.append(f"{label}: device reports no media profiles")
+                continue
+            try:
+                uri = _media.get_snapshot_uri(sess, profs[0].token)
+            except Exception as e:
+                attempts.append(f"{label}: GetSnapshotUri threw ({e})")
+                continue
+            if not uri:
+                attempts.append(f"{label}: device exposes no snapshot URI")
+                continue
+            # Two HTTP attempts: with digest/basic auth, then anonymous.
+            for mode in ("auth", "anon"):
+                try:
+                    if mode == "auth":
+                        pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+                        pm.add_password(None, uri, user, password or "")
+                        opener = urllib.request.build_opener(
+                            urllib.request.HTTPBasicAuthHandler(pm),
+                            urllib.request.HTTPDigestAuthHandler(pm),
+                        )
+                        src = opener
+                    else:
+                        src = urllib.request
+                    with src.open(uri, timeout=6) as r:  # type: ignore[union-attr]
+                        data = r.read()
+                    _creds.remember(host, user, password)
+                    return Response(content=data, media_type="image/jpeg")
+                except urllib.error.HTTPError as he:
+                    attempts.append(f"{label}/{mode}: HTTP {he.code} from {uri}")
+                    if he.code != 401:
+                        break  # non-auth error, no point trying anon
+                except Exception as e:
+                    attempts.append(f"{label}/{mode}: {e}")
+                    break
+        for a in attempts:
+            log.info("snapshot %s: %s", host, a)
+        return Response(status_code=404, content=b"", media_type="image/jpeg")
 
     return app
 
