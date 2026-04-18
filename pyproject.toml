@@ -1,0 +1,69 @@
+[project]
+name = "onvifcfg"
+version = "0.1.0"
+description = "ONVIF network configuration CLI tool"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [{ name = "onvifcfg contributors" }]
+keywords = ["onvif", "camera", "network", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: System :: Networking",
+]
+dependencies = [
+    "onvif-zeep>=0.2.12",
+    "pydantic>=2.5",
+    "typer>=0.12",
+    "rich>=13.7",
+    "wsdiscovery>=2.1",
+]
+
+[project.scripts]
+onvifcfg = "onvifcfg.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/andrewhack/odm"
+Repository = "https://github.com/andrewhack/odm"
+Upstream = "https://svn.code.sf.net/p/onvifdm/code/trunk"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/onvifcfg"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "UP", "C4", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
