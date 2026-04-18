@@ -1,9 +1,8 @@
 """Thin ONVIF session wrapper.
 
-Builds a zeep-backed ONVIFCamera with conservative per-call timeouts.  All
-methods are synchronous - the CLI is single-shot and a sync API is easier to
-reason about.  If a FastAPI server mode gets added later, the calls are cheap
-to wrap in `asyncio.to_thread`.
+Builds a zeep-backed ONVIFCamera and exposes the three services the rest of
+the package uses: device, media, ptz.  All methods are sync; if an async
+context is added later the calls are cheap to wrap with ``asyncio.to_thread``.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ class Credentials:
 
 
 class DeviceSession:
-    """Wraps an ONVIFCamera with the device service ready to use."""
+    """Wraps an ONVIFCamera with device/media/ptz services lazily created."""
 
     def __init__(
         self,
@@ -43,28 +42,47 @@ class DeviceSession:
         self.host = host
         self.port = port
         self._device = self._cam.create_devicemgmt_service()
+        self._media: Any | None = None
+        self._ptz: Any | None = None
 
-    # ------------------------------------------------------------------
-    # Thin passthrough helpers - each one wraps a raw SOAP call.  Kept in
-    # one place so timeouts, retries or instrumentation can be added once.
-    # ------------------------------------------------------------------
+    # ---- services ----------------------------------------------------
 
     @property
     def device(self) -> Any:
         return self._device
 
+    @property
+    def media(self) -> Any:
+        if self._media is None:
+            self._media = self._cam.create_media_service()
+        return self._media
+
+    @property
+    def ptz(self) -> Any:
+        if self._ptz is None:
+            self._ptz = self._cam.create_ptz_service()
+        return self._ptz
+
+    # ---- generic call helpers ----------------------------------------
+
     def call(self, method: str, *args: Any, **kwargs: Any) -> Any:
-        fn = getattr(self._device, method)
-        return fn(*args, **kwargs)
+        return getattr(self._device, method)(*args, **kwargs)
 
     def safe_call(self, method: str, *args: Any, **kwargs: Any) -> Any | None:
-        """Call a SOAP op, return None if the device reports ActionNotSupported.
+        """Call a device op, return None on fault.
 
-        Use for capability-advisory calls (GetZeroConfiguration, GetDiscoveryMode,
+        Used for capability-advisory ops (GetZeroConfiguration, GetDiscoveryMode,
         SetHostnameFromDHCP) where a fault should not abort the surrounding flow.
         """
         try:
             return self.call(method, *args, **kwargs)
         except Exception as e:
             log.debug("safe_call %s swallowed: %s", method, e)
+            return None
+
+    def safe_service_call(self, service: Any, method: str, *args: Any, **kwargs: Any) -> Any | None:
+        try:
+            return getattr(service, method)(*args, **kwargs)
+        except Exception as e:
+            log.debug("safe_service_call %s.%s swallowed: %s", service, method, e)
             return None

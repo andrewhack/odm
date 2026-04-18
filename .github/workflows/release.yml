@@ -1,0 +1,72 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout linux branch
+        uses: actions/checkout@v4
+        with:
+          ref: linux
+          path: src
+      - uses: astral-sh/setup-uv@v3
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: install nfpm
+        run: |
+          curl -sL -o /tmp/nfpm.deb "https://github.com/goreleaser/nfpm/releases/download/v2.38.0/nfpm_2.38.0_amd64.deb"
+          sudo dpkg -i /tmp/nfpm.deb
+      - name: build .deb
+        working-directory: src
+        run: bash packaging/deb/build-deb.sh
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onvifcfg-deb
+          path: src/dist/*.deb
+
+  build-msi:
+    runs-on: windows-latest
+    steps:
+      - name: checkout windows-msi branch
+        uses: actions/checkout@v4
+        with:
+          ref: windows-msi
+          path: src
+      - uses: astral-sh/setup-uv@v3
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - name: install WiX v4
+        run: dotnet tool install -g wix
+      - name: build .msi
+        working-directory: src
+        run: pwsh packaging\msi\build-msi.ps1
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onvifcfg-msi
+          path: src\dist\*.msi
+
+  release:
+    needs: [build-deb, build-msi]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/onvifcfg-deb/*.deb
+            artifacts/onvifcfg-msi/*.msi
+          generate_release_notes: true
