@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX v4 source file for the onvifcfg MSI.
+
+  Builds a minimal MSI that installs the PyInstaller-bundled
+  onvifcfg.exe to "Program Files\onvifcfg\" and adds that folder to
+  the machine-wide PATH.
+
+  Uses properties set at build time via -d:
+      Version=0.1.0
+      BuildDir=..\..\dist
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="onvifcfg"
+           Manufacturer="onvifcfg contributors"
+           Version="$(Version)"
+           UpgradeCode="b1e5a6c2-4a1f-4ad3-9c7a-4f1a8e2b9a01"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of onvifcfg is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Main" Title="onvifcfg" Level="1" Display="expand">
+      <ComponentGroupRef Id="OnvifcfgFiles" />
+      <ComponentRef Id="OnvifcfgPathEnv" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="onvifcfg" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="OnvifcfgFiles" Directory="INSTALLFOLDER">
+      <Component Id="OnvifcfgExe" Guid="*">
+        <File Id="OnvifcfgExeFile" Source="$(BuildDir)\onvifcfg.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="OnvifcfgPathEnv" Directory="INSTALLFOLDER" Guid="7b1f5d3e-5a22-4d1e-9b4f-3c7a8e2f1b02">
+      <Environment Id="OnvifcfgPath"
+                   Name="PATH"
+                   Value="[INSTALLFOLDER]"
+                   Permanent="no"
+                   Part="last"
+                   Action="set"
+                   System="yes" />
+      <RegistryValue Root="HKLM"
+                     Key="Software\onvifcfg"
+                     Name="Installed"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

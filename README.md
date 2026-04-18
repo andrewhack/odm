@@ -3,7 +3,7 @@
 Cross-platform ONVIF IP camera configuration tool.  Same feature scope as
 the upstream ONVIF Device Manager — network configuration, device info,
 user management, PTZ, live video preview — delivered as both a CLI
-(`onvifcfg`) and a local browser UI (`onvifcfg serve` → localhost:3003).
+(`onvifcfg`) and a local browser UI (`onvifcfg serve` â†’ localhost:3003).
 The rewrite ships every reliability and compatibility fix identified in
 the prior review of the legacy ODM source.
 
@@ -80,15 +80,6 @@ Tracked in full in [docs/ROADMAP.md](docs/ROADMAP.md). The headline items:
 uv sync
 uv run onvifcfg --help
 ```
-
-Per-platform packaged installs:
-
-- **Linux (Debian/Ubuntu .deb)** — switch to branch [`linux`](../../tree/linux),
-  run `bash packaging/deb/build-deb.sh` on a Linux host with `uv` and `nfpm`
-- **Windows (MSI)** — switch to branch [`windows-msi`](../../tree/windows-msi),
-  run `pwsh packaging/msi/build-msi.ps1` on a Windows host with `uv`
-  and the WiX v4 toolset
-
 
 ## Windows (MSI / EXE)
 
