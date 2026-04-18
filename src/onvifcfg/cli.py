@@ -83,9 +83,13 @@ def serve(
 
     from .web.app import create_app
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
     app_ = create_app()
     console.print(f"[green]onvifcfg web UI on http://{host}:{port}/[/]")
-    uvicorn.run(app_, host=host, port=port, log_level="warning")
+    uvicorn.run(app_, host=host, port=port, log_level="info")
 
 
 @app.command()
