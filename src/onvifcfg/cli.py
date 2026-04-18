@@ -76,7 +76,7 @@ def version() -> None:
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", "--host"),
-    port: int = typer.Option(8080, "--port", "-P"),
+    port: int = typer.Option(3003, "--port", "-P"),
 ) -> None:
     """Launch the local web UI (FastAPI + Jinja)."""
     import uvicorn

@@ -102,7 +102,13 @@ class DeviceSession:
     # ---- generic call helpers ----------------------------------------
 
     def call(self, method: str, *args: Any, **kwargs: Any) -> Any:
-        return getattr(self._device, method)(*args, **kwargs)
+        fn = getattr(self._device, method)
+        # onvif-zeep's service_wrapper takes a single positional dict,
+        # not loose kwargs. Repack kwargs into a dict when the caller
+        # used keyword-argument style.
+        if kwargs and not args:
+            return fn(dict(kwargs))
+        return fn(*args, **kwargs)
 
     def safe_call(self, method: str, *args: Any, **kwargs: Any) -> Any | None:
         """Call a device op, return None on fault.

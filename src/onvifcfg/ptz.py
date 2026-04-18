@@ -56,13 +56,13 @@ def continuous_move(
     Passing a zero vector is equivalent to ``stop()``.
     """
     _check_speed(velocity)
-    sess.ptz.ContinuousMove(
-        ProfileToken=profile_token,
-        Velocity={
+    sess.ptz.ContinuousMove({
+        "ProfileToken": profile_token,
+        "Velocity": {
             "PanTilt": {"x": velocity.pan, "y": velocity.tilt},
             "Zoom": {"x": velocity.zoom},
         },
-    )
+    })
     if duration_s is not None:
         time.sleep(duration_s)
         stop(sess, profile_token)
@@ -89,7 +89,7 @@ def relative_move(
             "PanTilt": {"x": speed.pan, "y": speed.tilt},
             "Zoom": {"x": speed.zoom},
         }
-    sess.ptz.RelativeMove(**payload)
+    sess.ptz.RelativeMove(payload)
 
 
 def absolute_move(
@@ -111,15 +111,15 @@ def absolute_move(
             "PanTilt": {"x": speed.pan, "y": speed.tilt},
             "Zoom": {"x": speed.zoom},
         }
-    sess.ptz.AbsoluteMove(**payload)
+    sess.ptz.AbsoluteMove(payload)
 
 
 def stop(sess: DeviceSession, profile_token: str) -> None:
-    sess.ptz.Stop(ProfileToken=profile_token, PanTilt=True, Zoom=True)
+    sess.ptz.Stop({"ProfileToken": profile_token, "PanTilt": True, "Zoom": True})
 
 
 def get_status(sess: DeviceSession, profile_token: str) -> PTZStatus:
-    s = sess.ptz.GetStatus(ProfileToken=profile_token)
+    s = sess.ptz.GetStatus({"ProfileToken": profile_token})
     pos = getattr(s, "Position", None)
     mov = getattr(s, "MoveStatus", None)
     pan = tilt = zoom = None
@@ -144,7 +144,7 @@ def get_status(sess: DeviceSession, profile_token: str) -> PTZStatus:
 
 
 def get_presets(sess: DeviceSession, profile_token: str) -> list[Preset]:
-    raw = sess.ptz.GetPresets(ProfileToken=profile_token) or []
+    raw = sess.ptz.GetPresets({"ProfileToken": profile_token}) or []
     out: list[Preset] = []
     for p in raw:
         out.append(Preset(token=p.token, name=getattr(p, "Name", "") or p.token))
@@ -161,7 +161,7 @@ def goto_preset(
             "PanTilt": {"x": speed.pan, "y": speed.tilt},
             "Zoom": {"x": speed.zoom},
         }
-    sess.ptz.GotoPreset(**payload)
+    sess.ptz.GotoPreset(payload)
 
 
 def set_preset(
@@ -177,17 +177,17 @@ def set_preset(
         payload["PresetName"] = name
     if preset_token:
         payload["PresetToken"] = preset_token
-    resp = sess.ptz.SetPreset(**payload)
+    resp = sess.ptz.SetPreset(payload)
     return str(resp) if isinstance(resp, str) else str(getattr(resp, "PresetToken", ""))
 
 
 def remove_preset(sess: DeviceSession, profile_token: str, preset_token: str) -> None:
-    sess.ptz.RemovePreset(ProfileToken=profile_token, PresetToken=preset_token)
+    sess.ptz.RemovePreset({"ProfileToken": profile_token, "PresetToken": preset_token})
 
 
 def goto_home(sess: DeviceSession, profile_token: str) -> None:
-    sess.ptz.GotoHomePosition(ProfileToken=profile_token)
+    sess.ptz.GotoHomePosition({"ProfileToken": profile_token})
 
 
 def set_home(sess: DeviceSession, profile_token: str) -> None:
-    sess.ptz.SetHomePosition(ProfileToken=profile_token)
+    sess.ptz.SetHomePosition({"ProfileToken": profile_token})

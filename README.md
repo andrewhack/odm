@@ -3,7 +3,7 @@
 Cross-platform ONVIF IP camera configuration tool.  Same feature scope as
 the upstream ONVIF Device Manager — network configuration, device info,
 user management, PTZ, live video preview — delivered as both a CLI
-(`onvifcfg`) and a local browser UI (`onvifcfg serve` → localhost:8080).
+(`onvifcfg`) and a local browser UI (`onvifcfg serve` → localhost:3003).
 The rewrite ships every reliability and compatibility fix identified in
 the prior review of the legacy ODM source.
 
@@ -87,8 +87,8 @@ onvifcfg apply 192.168.1.100 -u admin -p secret --rtsp 8554
 ## Usage — web UI
 
 ```bash
-onvifcfg serve            # binds 127.0.0.1:8080 by default
-# then open http://localhost:8080/ in any browser
+onvifcfg serve            # binds 127.0.0.1:3003 by default
+# then open http://localhost:3003/ in any browser
 ```
 
 The web UI exposes the same discover / read / apply flow with a click-
