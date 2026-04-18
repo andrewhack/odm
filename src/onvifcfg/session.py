@@ -8,6 +8,8 @@ context is added later the calls are cheap to wrap with ``asyncio.to_thread``.
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +18,37 @@ from onvif import ONVIFCamera  # type: ignore[import-untyped]
 from .exceptions import SessionError
 
 log = logging.getLogger(__name__)
+
+
+def _resolve_wsdl_dir() -> str:
+    """Locate the onvif-zeep WSDL directory in both dev and frozen runtimes.
+
+    PyInstaller onefile extracts data files under ``sys._MEIPASS``. The
+    collected ``onvif/wsdl`` tree lives there. In a regular install,
+    ``importlib.resources`` returns the on-disk path.
+    """
+    try:
+        from importlib.resources import files
+        candidate = str(files("onvif") / "wsdl")
+        if os.path.isdir(candidate):
+            return candidate
+    except Exception:
+        pass
+    # Frozen fallback - pyinstaller onefile _MEIPASS layout
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidate = os.path.join(meipass, "onvif", "wsdl")
+        if os.path.isdir(candidate):
+            return candidate
+    # Last resort - let onvif-zeep try its own resolution
+    import onvif as _onvif
+    pkg_dir = os.path.dirname(os.path.abspath(_onvif.__file__))
+    candidate = os.path.join(pkg_dir, "wsdl")
+    if os.path.isdir(candidate):
+        return candidate
+    raise RuntimeError(
+        "could not locate onvif-zeep WSDL directory - is the package installed correctly?"
+    )
 
 
 @dataclass(slots=True)
@@ -36,7 +69,10 @@ class DeviceSession:
         wsdl_dir: str | None = None,
     ) -> None:
         try:
-            self._cam = ONVIFCamera(host, port, creds.user, creds.password, wsdl_dir)
+            self._cam = ONVIFCamera(
+                host, port, creds.user, creds.password,
+                wsdl_dir or _resolve_wsdl_dir(),
+            )
         except Exception as e:
             raise SessionError(f"failed to open ONVIF session to {host}:{port}: {e}") from e
         self.host = host
