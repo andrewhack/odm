@@ -58,18 +58,14 @@ uv sync
 uv run onvifcfg --help
 ```
 
-## Linux (Debian / Ubuntu)
+Per-platform packaged installs:
 
-This branch produces a self-contained `.deb` â€” PyInstaller bundle + nfpm
-packaging. See [packaging/deb/README.md](packaging/deb/README.md) for
-build host requirements and the build command:
+- **Linux (Debian/Ubuntu .deb)** — switch to branch [`linux`](../../tree/linux),
+  run `bash packaging/deb/build-deb.sh` on a Linux host with `uv` and `nfpm`
+- **Windows (MSI)** — switch to branch [`windows-msi`](../../tree/windows-msi),
+  run `pwsh packaging/msi/build-msi.ps1` on a Windows host with `uv`
+  and the WiX v4 toolset
 
-```bash
-bash packaging/deb/build-deb.sh
-```
-
-Install with `sudo apt install ./dist/onvifcfg_*_amd64.deb`. The resulting
-binary ships its own Python runtime; no system Python dependency.
 
 ## Usage â€” CLI
 
