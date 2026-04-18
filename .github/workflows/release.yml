@@ -47,7 +47,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
       - name: install WiX v4
-        run: dotnet tool install -g wix
+        # Pin to 4.x - WiX 5/7 require OSMF EULA acceptance that can't be
+        # given in unattended CI.
+        run: dotnet tool install -g wix --version 4.0.6
       - name: build .msi
         working-directory: src
         run: pwsh packaging\msi\build-msi.ps1
