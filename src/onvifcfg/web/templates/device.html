@@ -9,6 +9,43 @@
   <div class="ok" style="padding:6px 10px">{{ auto_login_note }}</div>
 {% endif %}
 
+{% if info %}
+<h3>device</h3>
+<table>
+  <tbody>
+    <tr><th>manufacturer</th><td>{{ info.manufacturer or '-' }}</td></tr>
+    <tr><th>model</th><td>{{ info.model or '-' }}</td></tr>
+    <tr><th>firmware</th><td>{{ info.firmware_version or '-' }}</td></tr>
+    <tr><th>serial</th><td>{{ info.serial_number or '-' }}</td></tr>
+    <tr><th>hardware id</th><td>{{ info.hardware_id or '-' }}</td></tr>
+  </tbody>
+</table>
+{% endif %}
+
+<h3>maintenance</h3>
+<form method="post" action="/action/reboot" style="display:inline-block; margin-right:1em"
+      onsubmit="return confirm('Reboot {{ host }}? The camera will be unreachable for ~60 seconds.')">
+  <input type="hidden" name="host" value="{{ host }}">
+  <input type="hidden" name="port" value="{{ port }}">
+  <input type="hidden" name="user" value="{{ user }}">
+  <input type="hidden" name="password" value="{{ password }}">
+  <button type="submit" class="secondary">reboot</button>
+</form>
+<form method="post" action="/action/factory-reset" style="display:inline-block"
+      onsubmit="return confirm('Factory-reset {{ host }}? This WIPES all configuration.')">
+  <input type="hidden" name="host" value="{{ host }}">
+  <input type="hidden" name="port" value="{{ port }}">
+  <input type="hidden" name="user" value="{{ user }}">
+  <input type="hidden" name="password" value="{{ password }}">
+  <label style="min-width:0"><input type="radio" name="mode" value="Soft" checked> Soft</label>
+  <label style="min-width:0"><input type="radio" name="mode" value="Hard"> Hard</label>
+  <button type="submit" class="danger">factory reset</button>
+</form>
+<p class="muted" style="margin-top:6px">
+  <strong>Soft</strong> keeps network settings. <strong>Hard</strong> wipes
+  everything - you will lose the device if you're on a remote network.
+</p>
+
 <h3>current state</h3>
 <table>
   <tbody>

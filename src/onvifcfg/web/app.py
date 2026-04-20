@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import credentials_cache as _creds
+from .. import device_info as _dev
 from .. import media as _media
 from ..discovery import discover as _discover
 from ..exceptions import OnvifcfgError, ValidationError
@@ -33,6 +34,15 @@ from ..validation import validate as _validate
 
 _here = Path(__file__).parent
 templates = Jinja2Templates(directory=str(_here / "templates"))
+
+# Inject build metadata so every template can render it in the footer.
+from .. import __version__ as _pkg_version
+try:
+    from .._buildinfo import GIT_SHA as _git_sha
+except Exception:
+    _git_sha = "dev"
+templates.env.globals["version"] = _pkg_version
+templates.env.globals["git_sha"] = _git_sha
 
 
 def create_app() -> FastAPI:
@@ -83,13 +93,14 @@ def create_app() -> FastAPI:
             except Exception:
                 continue
             _creds.remember(host, user, password)
+            info = _dev.get_device_info(sess) if _dev else None
             return templates.TemplateResponse(
                 request=request,
                 name="device.html",
                 context={
                     "request": request,
                     "host": host, "port": port, "user": user, "password": password,
-                    "state": state,
+                    "state": state, "info": info,
                     "auto_login_note": f"auto-logged in as '{user or '(anonymous)'}'",
                 },
             )
@@ -128,13 +139,14 @@ def create_app() -> FastAPI:
                 context={"request": request, "error": f"session error: {e}", "devices": [], "timeout": 3.0},
             )
         _creds.remember(host, user, password)
+        info = _dev.get_device_info(sess) if _dev else None
         return templates.TemplateResponse(
             request=request,
             name="device.html",
             context={
                 "request": request,
                 "host": host, "port": port, "user": user, "password": password,
-                "state": state,
+                "state": state, "info": info,
             },
         )
 
@@ -287,10 +299,41 @@ def create_app() -> FastAPI:
                 uri = _media.get_snapshot_uri(sess, profs[0].token)
             except Exception as e:
                 attempts.append(f"{label}: GetSnapshotUri threw ({e})")
-                continue
+                uri = None
+            # Fallback path: camera has no GetSnapshotUri but serves RTSP.
+            # Grab one frame with ffmpeg if the binary is on PATH.
             if not uri:
-                attempts.append(f"{label}: device exposes no snapshot URI")
-                continue
+                import shutil, subprocess
+                ffmpeg = shutil.which("ffmpeg")
+                if not ffmpeg:
+                    attempts.append(f"{label}: no snapshot URI and ffmpeg not found on PATH")
+                    continue
+                try:
+                    rtsp = _media.uri_with_credentials(
+                        _media.get_stream_uri(sess, profs[0].token), user, password
+                    )
+                except Exception as e:
+                    attempts.append(f"{label}: GetStreamUri failed ({e})")
+                    continue
+                try:
+                    proc = subprocess.run(
+                        [ffmpeg, "-hide_banner", "-loglevel", "error",
+                         "-rtsp_transport", "tcp", "-i", rtsp,
+                         "-vframes", "1", "-f", "mjpeg", "-"],
+                        capture_output=True, timeout=10,
+                    )
+                except Exception as e:
+                    attempts.append(f"{label}: ffmpeg spawn failed ({e})")
+                    continue
+                if proc.returncode != 0 or not proc.stdout:
+                    tail = (proc.stderr or b"")[-200:].decode("utf-8", "replace").strip()
+                    attempts.append(f"{label}: ffmpeg rc={proc.returncode} {tail}")
+                    continue
+                _creds.remember(host, user, password)
+                return Response(
+                    content=proc.stdout, media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"},
+                )
             # Two HTTP attempts: with digest/basic auth, then anonymous.
             for mode in ("auth", "anon"):
                 try:
@@ -360,6 +403,60 @@ def create_app() -> FastAPI:
             context={"request": request, "host": host, "port": port, "error": True},
         )
 
+
+
+    @app.post("/action/reboot", response_class=HTMLResponse)
+    def action_reboot(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+    ) -> Any:
+        from .. import maintenance as _maint
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            came_back = _maint.reboot(sess, wait_s=90.0)
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request, name="result.html",
+                context={"request": request, "host": host, "port": port, "error": f"reboot failed: {e}"},
+            )
+        return templates.TemplateResponse(
+            request=request, name="result.html",
+            context={
+                "request": request, "host": host, "port": port,
+                "result_msg": (
+                    f"device came back on {host}:{port}" if came_back
+                    else f"reboot requested - device did not answer within 90s"
+                ),
+            },
+        )
+
+    @app.post("/action/factory-reset", response_class=HTMLResponse)
+    def action_factory_reset(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        mode: str = Form("Soft"),
+    ) -> Any:
+        from .. import maintenance as _maint
+        m = _maint.FactoryDefault.HARD if mode == "Hard" else _maint.FactoryDefault.SOFT
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            _maint.factory_default(sess, m)
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request, name="result.html",
+                context={"request": request, "host": host, "port": port, "error": f"factory reset failed: {e}"},
+            )
+        return templates.TemplateResponse(
+            request=request, name="result.html",
+            context={"request": request, "host": host, "port": port,
+                     "result_msg": f"factory reset requested ({m.value})"},
+        )
 
     return app
 
