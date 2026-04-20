@@ -23,6 +23,9 @@ uv sync --extra build
 echo ">>> stamping build info"
 bash scripts/write_buildinfo.sh
 
+echo ">>> verify stamp lands in venv"
+uv run python -c "import onvifcfg._buildinfo as b; print('sha in venv:', b.GIT_SHA, 'time:', b.BUILD_TIME)"
+
 echo ">>> resolving onvif WSDL directory"
 # Look for the dir that actually contains devicemgmt.wsdl - onvif-zeep's
 # package layout has moved around between versions (sometimes onvif/wsdl,
@@ -57,6 +60,7 @@ uv run pyinstaller \
     --collect-all onvif \
     --collect-all wsdiscovery \
     --collect-all zeep \
+    --collect-all imageio_ffmpeg \
     src/onvifcfg/__main__.py
 
 echo ">>> nfpm deb"
