@@ -20,6 +20,9 @@ rm -rf dist build
 echo ">>> installing deps"
 uv sync --extra build
 
+echo ">>> stamping build info"
+bash scripts/write_buildinfo.sh
+
 echo ">>> resolving onvif WSDL directory"
 # Look for the dir that actually contains devicemgmt.wsdl - onvif-zeep's
 # package layout has moved around between versions (sometimes onvif/wsdl,
