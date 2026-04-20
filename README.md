@@ -149,6 +149,14 @@ tests/              # pytest suite
 docs/               # design notes and fix catalogue
 ```
 
+## Repository layout — branches
+
+This repo uses a multi-branch packaging model: `main` holds the source,
+and `linux` / `windows-msi` / `windows-exe` each carry one platform's
+installer recipe. Do **not** merge the packaging branches into `main`
+(GitHub will keep offering). See [docs/BRANCHES.md](docs/BRANCHES.md)
+for the full explanation.
+
 ## License
 
 The upstream ODM codebase was BSD-licensed; this rewrite uses the same terms.
