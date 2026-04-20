@@ -78,7 +78,7 @@ def read_state(sess: DeviceSession) -> NetworkState:
                 enabled=bool(zc_raw.Enabled),
                 interface_token=getattr(zc_raw, "InterfaceToken", None),
                 addresses=tuple(
-                    IPv4Address(a) for a in (getattr(zc_raw, "Addresses", None) or []) if a
+                    ip for ip in (_parse_ipv4(a) for a in (getattr(zc_raw, "Addresses", None) or [])) if ip is not None
                 ),
             )
         else:
@@ -101,6 +101,35 @@ def read_state(sess: DeviceSession) -> NetworkState:
     )
 
 
+def _parse_ipv4(raw: str) -> IPv4Address | None:
+    """Parse an IPv4 in dotted-decimal, or the occasional hex form.
+
+    Some cameras return addresses as a packed 32-bit hex int
+    (e.g. ``0x9605A8C0`` for 192.168.5.150 in little-endian byte order).
+    Try dotted-decimal first, then big-endian 32-bit int, then
+    little-endian.  Return None if all three fail so the caller can
+    skip the entry instead of blowing up the session.
+    """
+    s = raw.strip()
+    if not s:
+        return None
+    try:
+        return IPv4Address(s)
+    except (ValueError, TypeError):
+        pass
+    if s.lower().startswith("0x"):
+        try:
+            n = int(s, 16) & 0xFFFFFFFF
+        except ValueError:
+            return None
+        for order in ("big", "little"):
+            try:
+                return IPv4Address(n.to_bytes(4, order))
+            except (ValueError, OverflowError):
+                continue
+    return None
+
+
 def _parse_interface(nic: object) -> NetworkInterface:
     info = getattr(nic, "Info", None)
     mac = getattr(info, "HwAddress", None) if info else None
@@ -116,13 +145,13 @@ def _parse_interface(nic: object) -> NetworkInterface:
             if manual:
                 ipv4 = IPv4Config(
                     dhcp=dhcp,
-                    address=IPv4Address(manual[0].Address),
+                    address=_parse_ipv4(manual[0].Address),
                     prefix_length=int(manual[0].PrefixLength),
                 )
             elif from_dhcp is not None:
                 ipv4 = IPv4Config(
                     dhcp=dhcp,
-                    address=IPv4Address(from_dhcp.Address),
+                    address=_parse_ipv4(from_dhcp.Address),
                     prefix_length=int(from_dhcp.PrefixLength),
                 )
             else:
@@ -146,8 +175,14 @@ def _parse_dns(dns_raw: object) -> DNSInfo:
     servers: list[IPv4Address | IPv6Address] = []
     for s in servers_raw:
         addr = getattr(s, "IPv4Address", None) or getattr(s, "IPv6Address", None)
-        if addr:
-            servers.append(ip_address(addr))  # type: ignore[arg-type]
+        if not addr:
+            continue
+        try:
+            servers.append(ip_address(addr))
+        except ValueError:
+            ipv4 = _parse_ipv4(addr)
+            if ipv4 is not None:
+                servers.append(ipv4)
     return DNSInfo(
         from_dhcp=from_dhcp,
         servers=tuple(servers),

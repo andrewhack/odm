@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}onvifcfg — rtsp {{ host }}{% endblock %}
+{% block content %}
+
+<h2>RTSP stream — {{ host }}:{{ port }}</h2>
+
+{% if error %}
+  <div class="warn">
+    No cached credentials worked for this camera.  Open it once via the
+    <a href="/connect?host={{ host }}&amp;port={{ port }}">connect form</a> to
+    cache credentials, then come back here.
+  </div>
+{% else %}
+  <p class="muted">profile <strong>{{ profile_name }}</strong></p>
+
+  <fieldset>
+    <legend>clean URI (no credentials)</legend>
+    <div class="row">
+      <input type="text" readonly value="{{ uri }}" style="flex:1; min-width:480px"
+             onclick="this.select(); document.execCommand('copy');"
+             title="click to copy">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>URI with credentials (pastes directly into VLC)</legend>
+    <div class="row">
+      <input type="text" readonly value="{{ uri_with_creds }}" style="flex:1; min-width:480px"
+             onclick="this.select(); document.execCommand('copy');"
+             title="click to copy">
+    </div>
+    <p class="muted" style="margin-top:10px">
+      Open with VLC: <code>vlc "{{ uri_with_creds }}"</code>, or try
+      <a href="{{ uri_with_creds }}">open in default RTSP handler</a>
+      (most browsers hand it off to the system\'s default media player).
+    </p>
+  </fieldset>
+{% endif %}
+
+<p><a href="/?no_discover=1">&larr; back</a></p>
+
+{% endblock %}

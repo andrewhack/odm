@@ -32,7 +32,12 @@
             {% endif %}
           </td>
           <td><strong>{{ d.host }}</strong></td>
-          <td class="muted">{{ d.name or '-' }}</td>
+          <td class="muted">
+            {{ d.name or '-' }}
+            {% if d.authed %}
+              &middot; <a href="/rtsp/{{ d.host }}?port={{ d.port }}" title="show RTSP stream URL">rtsp&nbsp;&rarr;</a>
+            {% endif %}
+          </td>
           <td>{{ d.port }}</td>
           <td><a class="btn-link" href="/connect?host={{ d.host }}&amp;port={{ d.port }}">open</a></td>
         </tr>

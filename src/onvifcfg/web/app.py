@@ -319,6 +319,48 @@ def create_app() -> FastAPI:
             log.info("snapshot %s: %s", host, a)
         return Response(status_code=404, content=b"", media_type="image/jpeg")
 
+    @app.get("/rtsp/{host}", response_class=HTMLResponse)
+    def rtsp_link(request: Request, host: str, port: int = 80) -> Any:
+        """Return a page showing the RTSP stream URI for a camera.
+
+        Uses cached credentials (same as the snapshot endpoint) to open an
+        ONVIF session, fetch the first profile's stream URI, and render it
+        with a copy button and a VLC launch hint.  404-equivalent page if
+        no cached creds work.
+        """
+        for user, password in _creds.candidates(host):
+            try:
+                sess = DeviceSession(host, port, Credentials(user=user, password=password))
+                profs = _media.get_profiles(sess)
+            except Exception:
+                continue
+            if not profs:
+                continue
+            try:
+                uri = _media.get_stream_uri(sess, profs[0].token)
+            except Exception:
+                continue
+            with_creds = _media.uri_with_credentials(uri, user, password)
+            _creds.remember(host, user, password)
+            return templates.TemplateResponse(
+                request=request,
+                name="rtsp.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "profile_name": profs[0].name or profs[0].token,
+                    "uri": uri,
+                    "uri_with_creds": with_creds,
+                },
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="rtsp.html",
+            context={"request": request, "host": host, "port": port, "error": True},
+        )
+
+
     return app
 
 

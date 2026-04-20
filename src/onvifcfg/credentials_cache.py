@@ -124,13 +124,12 @@ def forget(host: str | None = None) -> None:
 
 
 def known(host: str) -> bool:
-    """True if any non-default (user, password) has ever been saved for ``host``.
+    """True if any (user, password) pair has ever been saved for ``host``.
 
-    The two blank-password defaults (admin/"", ""/"") don't count - they are
-    always in ``candidates`` regardless of whether the user authenticated.
+    Previously this filtered out the (admin, "") / ("", "") defaults so the
+    UI badge only lit up on "real" auth - but a camera that genuinely
+    accepts admin/"" has nonetheless been authenticated from the user's
+    perspective, and showing "locked" for a camera the user just opened is
+    confusing.  Any cached entry now counts.
     """
-    entries = _load().get(host, [])
-    for u, pw in entries:
-        if pw or (u and u != "admin"):
-            return True
-    return False
+    return bool(_load().get(host))
