@@ -8,7 +8,6 @@
     <thead>
       <tr>
         <th style="width:170px">preview</th>
-        <th style="width:40px" title="auth status"></th>
         <th>ip</th>
         <th>hostname</th>
         <th style="width:70px">port</th>
@@ -24,20 +23,8 @@
                  alt="snapshot"
                  onerror="this.outerHTML='<span class=&quot;snapshot-fallback&quot;>no preview</span>'">
           </td>
-          <td>
-            {% if d.authed %}
-              <span class="auth-ok" title="credentials cached">✓</span>
-            {% else %}
-              <span class="auth-no" title="no credentials on file">🔒</span>
-            {% endif %}
-          </td>
           <td><strong>{{ d.host }}</strong></td>
-          <td class="muted">
-            {{ d.name or '-' }}
-            {% if d.authed %}
-              &middot; <a href="/rtsp/{{ d.host }}?port={{ d.port }}" title="show RTSP stream URL">rtsp&nbsp;&rarr;</a>
-            {% endif %}
-          </td>
+          <td class="muted">{{ d.name or '-' }}</td>
           <td>{{ d.port }}</td>
           <td><a class="btn-link" href="/connect?host={{ d.host }}&amp;port={{ d.port }}">open</a></td>
         </tr>
