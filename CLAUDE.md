@@ -41,3 +41,4 @@ uv sync
 uv run pytest
 uv run onvifcfg --help
 ```
+<!-- build bump: MSI AllowSameVersionUpgrades fix -->
