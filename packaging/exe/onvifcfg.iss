@@ -17,8 +17,8 @@
 AppId={{9A3B7F2E-4E1C-4D1B-9C8F-3E5A2B7F1D01}
 AppName=onvifcfg
 AppVersion={#AppVersion}
-AppPublisher=onvifcfg contributors
-AppPublisherURL=https://github.com/andrewhack/odm
+AppPublisher=ITCom Solutions
+AppPublisherURL=https://itcom-solitions.com
 AppSupportURL=https://github.com/andrewhack/odm/issues
 DefaultDirName={autopf}\onvifcfg
 DefaultGroupName=onvifcfg

@@ -34,6 +34,9 @@ uv sync --extra build
 Write-Host ">>> stamping build info"
 pwsh -File scripts/write_buildinfo.ps1
 
+Write-Host ">>> verify stamp lands in venv"
+uv run python -c "import onvifcfg._buildinfo as b; print('sha in venv:', b.GIT_SHA, 'time:', b.BUILD_TIME)"
+
 Write-Host ">>> resolving onvif WSDL directory"
 $finder = @"
 from pathlib import Path
@@ -63,6 +66,7 @@ uv run pyinstaller `
     --collect-all onvif `
     --collect-all wsdiscovery `
     --collect-all zeep `
+    --collect-all imageio_ffmpeg `
     src\onvifcfg\__main__.py
 
 if (-not (Test-Path 'dist\onvifcfg.exe')) {
