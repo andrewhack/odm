@@ -285,22 +285,27 @@ def create_app() -> FastAPI:
             + ", ".join(u or "(anon)" for u, _ in cands),
             file=sys.stderr, flush=True,
         )
-        """JPEG snapshot using cached credentials with auth + no-auth fallback.
+        """JPEG snapshot using cached creds with auth + no-auth + RTSP fallback.
 
         For each (user, password) candidate in the cache:
           1. Open an ONVIF session with those creds.
-          2. Get the first profile's snapshot URI.
-          3. Fetch the URI with digest/basic auth configured.
-          4. If that returns 401, retry without any auth (many cameras
-             serve snapshots anonymously on HTTP even when ONVIF is
-             locked down).
-          5. If the HTTP fetch still fails, try the RTSP fallback below.
-        On every failure, log the reason so "onvifcfg serve" console
-        shows why a given camera has no preview.
+          2. Ask for the first profile's GetSnapshotUri.
+          3. If the device returns one, fetch it with digest/basic auth,
+             then retry anonymously if that returned 401.
+        If no candidate produced a working HTTP snapshot AND at least one
+        session authenticated successfully, fall back ONCE to an ffmpeg
+        grab from the RTSP stream.  The fallback runs outside the
+        per-credential loop on purpose: running it per-credential burned
+        the camera's 10s RTSP timeout on every wrong cred, which made
+        every snapshot look broken whenever the right cred was not the
+        first one in the list.
         """
         import logging, urllib.error, urllib.request
         log = logging.getLogger("onvifcfg.snapshot")
         attempts: list[str] = []
+        # First authenticated (user, password, profile_token) - for the
+        # single ffmpeg fallback at the end.
+        rtsp_fallback: tuple[str, str, str] | None = None
         for user, password in cands:
             label = user or "(anon)"
             try:
@@ -312,54 +317,16 @@ def create_app() -> FastAPI:
             if not profs:
                 attempts.append(f"{label}: device reports no media profiles")
                 continue
+            if rtsp_fallback is None:
+                rtsp_fallback = (user, password, profs[0].token)
             try:
                 uri = _media.get_snapshot_uri(sess, profs[0].token)
             except Exception as e:
                 attempts.append(f"{label}: GetSnapshotUri threw ({e})")
                 uri = None
-            # Fallback path: camera has no GetSnapshotUri but serves RTSP.
-            # Grab one frame with ffmpeg.  Prefer the imageio-ffmpeg bundled
-            # binary (ships inside the MSI/EXE/DEB) so this works without
-            # the user installing ffmpeg separately; fall back to PATH.
             if not uri:
-                import shutil, subprocess
-                ffmpeg = None
-                try:
-                    import imageio_ffmpeg as _iio
-                    ffmpeg = _iio.get_ffmpeg_exe()
-                except Exception as e:
-                    attempts.append(f"{label}: imageio_ffmpeg unavailable ({e})")
-                if not ffmpeg:
-                    ffmpeg = shutil.which("ffmpeg")
-                if not ffmpeg:
-                    attempts.append(f"{label}: no snapshot URI and ffmpeg not found")
-                    continue
-                try:
-                    rtsp = _media.uri_with_credentials(
-                        _media.get_stream_uri(sess, profs[0].token), user, password
-                    )
-                except Exception as e:
-                    attempts.append(f"{label}: GetStreamUri failed ({e})")
-                    continue
-                try:
-                    proc = subprocess.run(
-                        [ffmpeg, "-hide_banner", "-loglevel", "error",
-                         "-rtsp_transport", "tcp", "-i", rtsp,
-                         "-vframes", "1", "-f", "mjpeg", "-"],
-                        capture_output=True, timeout=10,
-                    )
-                except Exception as e:
-                    attempts.append(f"{label}: ffmpeg spawn failed ({e})")
-                    continue
-                if proc.returncode != 0 or not proc.stdout:
-                    tail = (proc.stderr or b"")[-200:].decode("utf-8", "replace").strip()
-                    attempts.append(f"{label}: ffmpeg rc={proc.returncode} {tail}")
-                    continue
-                _creds.remember(host, user, password)
-                return Response(
-                    content=proc.stdout, media_type="image/jpeg",
-                    headers={"Cache-Control": "no-store"},
-                )
+                attempts.append(f"{label}: device exposes no snapshot URI")
+                continue
             # Two HTTP attempts: with digest/basic auth, then anonymous.
             for mode in ("auth", "anon"):
                 try:
@@ -370,22 +337,70 @@ def create_app() -> FastAPI:
                             urllib.request.HTTPBasicAuthHandler(pm),
                             urllib.request.HTTPDigestAuthHandler(pm),
                         )
-                        src = opener
+                        src_opener: Any = opener
                     else:
-                        src = urllib.request
-                    with src.open(uri, timeout=6) as r:  # type: ignore[union-attr]
+                        src_opener = urllib.request
+                    with src_opener.open(uri, timeout=6) as r:
                         data = r.read()
                     _creds.remember(host, user, password)
-                    return Response(content=data, media_type="image/jpeg")
+                    return Response(
+                        content=data, media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store"},
+                    )
                 except urllib.error.HTTPError as he:
                     attempts.append(f"{label}/{mode}: HTTP {he.code} from {uri}")
                     if he.code != 401:
-                        break  # non-auth error, no point trying anon
+                        break
                 except Exception as e:
                     attempts.append(f"{label}/{mode}: {e}")
                     break
+        # One-shot ffmpeg RTSP->JPEG fallback, using the first cred that
+        # authenticated.  Runs at most ONCE per /snapshot request so a
+        # camera without GetSnapshotUri still renders, without 10s-per-
+        # wrong-credential stalls.
+        if rtsp_fallback is not None:
+            f_user, f_password, prof_token = rtsp_fallback
+            import shutil, subprocess
+            ffmpeg = None
+            try:
+                import imageio_ffmpeg as _iio
+                ffmpeg = _iio.get_ffmpeg_exe()
+            except Exception as e:
+                attempts.append(f"imageio_ffmpeg unavailable ({e})")
+            if not ffmpeg:
+                ffmpeg = shutil.which("ffmpeg")
+            if ffmpeg:
+                try:
+                    sess = DeviceSession(
+                        host, port,
+                        Credentials(user=f_user, password=f_password),
+                    )
+                    stream = _media.get_stream_uri(sess, prof_token)
+                    rtsp = _media.uri_with_credentials(stream, f_user, f_password)
+                    proc = subprocess.run(
+                        [ffmpeg, "-hide_banner", "-loglevel", "error",
+                         "-rtsp_transport", "tcp", "-i", rtsp,
+                         "-vframes", "1", "-f", "mjpeg", "-"],
+                        capture_output=True, timeout=6,
+                    )
+                    if proc.returncode == 0 and proc.stdout:
+                        _creds.remember(host, f_user, f_password)
+                        return Response(
+                            content=proc.stdout, media_type="image/jpeg",
+                            headers={"Cache-Control": "no-store"},
+                        )
+                    tail = (proc.stderr or b"")[-200:].decode("utf-8", "replace").strip()
+                    attempts.append(f"ffmpeg rc={proc.returncode} {tail}")
+                except Exception as e:
+                    attempts.append(f"ffmpeg path failed ({e})")
+            else:
+                attempts.append("no snapshot URI and ffmpeg not available")
         for a in attempts:
             log.info("snapshot %s: %s", host, a)
+        print(
+            f"[snapshot {host}:{port}] attempts: " + " | ".join(attempts),
+            file=sys.stderr, flush=True,
+        )
         return Response(status_code=404, content=b"", media_type="image/jpeg")
 
     @app.get("/rtsp/{host}", response_class=HTMLResponse)
@@ -399,22 +414,28 @@ def create_app() -> FastAPI:
         and render it with a copy button and a VLC launch hint.
         404-equivalent page if no cached creds work.
 
-        The ``profile`` query-string selects which media profile to pull
-        the RTSP URI from; defaults to the first profile if omitted or
-        unknown on this device.
+        The ``profile`` query-string is an optional hint selecting which
+        media profile to pull the RTSP URI from; falls back to the first
+        profile when omitted, blank, or not found on this device.
         """
+        import sys
+        attempts: list[str] = []
         for user, password in _creds.candidates(host):
+            label = user or "(anon)"
             try:
                 sess = DeviceSession(host, port, Credentials(user=user, password=password))
                 profs = _media.get_profiles(sess)
-            except Exception:
+            except Exception as e:
+                attempts.append(f"{label}: session/profiles failed ({e})")
                 continue
             if not profs:
+                attempts.append(f"{label}: device reports no media profiles")
                 continue
-            chosen = next((p for p in profs if p.token == profile), profs[0])
+            chosen = next((p for p in profs if p.token == profile), profs[0]) if profile else profs[0]
             try:
                 uri = _media.get_stream_uri(sess, chosen.token)
-            except Exception:
+            except Exception as e:
+                attempts.append(f"{label}: GetStreamUri failed ({e})")
                 continue
             with_creds = _media.uri_with_credentials(uri, user, password)
             _creds.remember(host, user, password)
@@ -430,6 +451,11 @@ def create_app() -> FastAPI:
                     "uri_with_creds": with_creds,
                 },
             )
+        print(
+            f"[rtsp {host}:{port}] no cached cred worked; attempts: "
+            + " | ".join(attempts),
+            file=sys.stderr, flush=True,
+        )
         return templates.TemplateResponse(
             request=request,
             name="rtsp.html",
