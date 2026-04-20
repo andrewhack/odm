@@ -365,11 +365,15 @@ def create_app() -> FastAPI:
             try:
                 import imageio_ffmpeg as _iio
                 ffmpeg = _iio.get_ffmpeg_exe()
+                attempts.append(f"ffmpeg=imageio_ffmpeg:{ffmpeg}")
             except Exception as e:
                 attempts.append(f"imageio_ffmpeg unavailable ({e})")
             if not ffmpeg:
                 ffmpeg = shutil.which("ffmpeg")
+                if ffmpeg:
+                    attempts.append(f"ffmpeg=PATH:{ffmpeg}")
             if ffmpeg:
+                rtsp = "<not resolved>"
                 try:
                     sess = DeviceSession(
                         host, port,
@@ -377,31 +381,54 @@ def create_app() -> FastAPI:
                     )
                     stream = _media.get_stream_uri(sess, prof_token)
                     rtsp = _media.uri_with_credentials(stream, f_user, f_password)
+                    # Log the RTSP URI we are about to hand ffmpeg - without
+                    # the password, so the stderr trace is safe to share.
+                    from urllib.parse import urlparse, urlunparse
+                    p = urlparse(rtsp)
+                    safe_netloc = p.hostname or ""
+                    if p.port:
+                        safe_netloc = f"{safe_netloc}:{p.port}"
+                    if p.username:
+                        safe_netloc = f"{p.username}:***@{safe_netloc}"
+                    attempts.append(f"rtsp={urlunparse((p.scheme, safe_netloc, p.path, '', '', ''))}")
                     proc = subprocess.run(
                         [ffmpeg, "-hide_banner", "-loglevel", "error",
                          "-rtsp_transport", "tcp", "-i", rtsp,
                          "-vframes", "1", "-f", "mjpeg", "-"],
-                        capture_output=True, timeout=6,
+                        capture_output=True, timeout=15,
                     )
                     if proc.returncode == 0 and proc.stdout:
                         _creds.remember(host, f_user, f_password)
+                        attempts.append(f"ffmpeg OK, {len(proc.stdout)} bytes")
+                        print(
+                            f"[snapshot {host}:{port}] OK via ffmpeg "
+                            f"({len(proc.stdout)} bytes)",
+                            file=sys.stderr, flush=True,
+                        )
                         return Response(
                             content=proc.stdout, media_type="image/jpeg",
                             headers={"Cache-Control": "no-store"},
                         )
-                    tail = (proc.stderr or b"")[-200:].decode("utf-8", "replace").strip()
-                    attempts.append(f"ffmpeg rc={proc.returncode} {tail}")
+                    tail = (proc.stderr or b"")[-400:].decode("utf-8", "replace").strip()
+                    attempts.append(f"ffmpeg rc={proc.returncode} stderr={tail!r}")
+                except subprocess.TimeoutExpired:
+                    attempts.append(f"ffmpeg timed out after 15s on {rtsp[:80]}")
                 except Exception as e:
-                    attempts.append(f"ffmpeg path failed ({e})")
+                    attempts.append(f"ffmpeg path failed ({type(e).__name__}: {e})")
             else:
                 attempts.append("no snapshot URI and ffmpeg not available")
         for a in attempts:
             log.info("snapshot %s: %s", host, a)
-        print(
-            f"[snapshot {host}:{port}] attempts: " + " | ".join(attempts),
-            file=sys.stderr, flush=True,
+        diagnostic = f"[snapshot {host}:{port}] attempts: " + " | ".join(attempts)
+        print(diagnostic, file=sys.stderr, flush=True)
+        # Return the diagnostic as the response body so curl / DevTools
+        # shows the reason inline without needing the server console.
+        return Response(
+            status_code=404,
+            content=diagnostic.encode("utf-8"),
+            media_type="text/plain; charset=utf-8",
+            headers={"Cache-Control": "no-store"},
         )
-        return Response(status_code=404, content=b"", media_type="image/jpeg")
 
     @app.get("/rtsp/{host}", response_class=HTMLResponse)
     def rtsp_link(
