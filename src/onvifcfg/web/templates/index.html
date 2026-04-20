@@ -8,6 +8,7 @@
     <thead>
       <tr>
         <th style="width:170px">preview</th>
+        <th style="width:40px" title="auth status"></th>
         <th>ip</th>
         <th>hostname</th>
         <th style="width:70px">port</th>
@@ -19,12 +20,24 @@
         <tr>
           <td>
             <img class="snapshot"
-                 src="/snapshot/{{ d.host }}.jpg?port={{ d.port }}"
+                 src="/snapshot/{{ d.host }}.jpg?port={{ d.port }}&amp;t={{ epoch }}"
                  alt="snapshot"
                  onerror="this.outerHTML='<span class=&quot;snapshot-fallback&quot;>no preview</span>'">
           </td>
+          <td>
+            {% if d.authed %}
+              <span class="auth-ok" title="credentials cached">&#10003;</span>
+            {% else %}
+              <span class="auth-no" title="no credentials on file">&#128274;</span>
+            {% endif %}
+          </td>
           <td><strong>{{ d.host }}</strong></td>
-          <td class="muted">{{ d.name or '-' }}</td>
+          <td class="muted">
+            {{ d.name or '-' }}
+            {% if d.authed %}
+              &middot; <a href="/rtsp/{{ d.host }}?port={{ d.port }}" title="show RTSP stream URL">rtsp&nbsp;&rarr;</a>
+            {% endif %}
+          </td>
           <td>{{ d.port }}</td>
           <td><a class="btn-link" href="/connect?host={{ d.host }}&amp;port={{ d.port }}">open</a></td>
         </tr>
@@ -44,7 +57,7 @@
 </div>
 
 <h2 style="margin-top:2em">connect manually</h2>
-<p class="muted">For cameras on a different subnet, or when discovery doesn't find them (common with factory-default 192.168.1.0/24 units).</p>
+<p class="muted">For cameras on a different subnet, or when discovery doesn't find them.</p>
 <form method="get" action="/connect">
   <div class="row"><label>host</label><input type="text" name="host" required placeholder="192.168.1.100"></div>
   <div class="row"><label>port</label><input type="number" name="port" value="80" min="1" max="65535"></div>
