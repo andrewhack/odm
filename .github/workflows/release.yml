@@ -33,6 +33,28 @@ jobs:
           name: onvifcfg-deb
           path: src/dist/*.deb
 
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - name: checkout windows-exe branch
+        uses: actions/checkout@v4
+        with:
+          ref: windows-exe
+          path: src
+      - uses: astral-sh/setup-uv@v3
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: build .exe installer
+        working-directory: src
+        run: pwsh packaging\exeuild-exe.ps1
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onvifcfg-exe
+          path: src\dist\onvifcfg-setup-*.exe
+
   build-msi:
     runs-on: windows-latest
     steps:
@@ -60,7 +82,7 @@ jobs:
           path: src\dist\*.msi
 
   release:
-    needs: [build-deb, build-msi]
+    needs: [build-deb, build-msi, build-exe]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -71,4 +93,5 @@ jobs:
           files: |
             artifacts/onvifcfg-deb/*.deb
             artifacts/onvifcfg-msi/*.msi
+            artifacts/onvifcfg-exe/*.exe
           generate_release_notes: true
