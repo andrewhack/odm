@@ -12,7 +12,7 @@
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="onvifcfg"
-           Manufacturer="onvifcfg contributors"
+           Manufacturer="ITCom Solutions"
            Version="$(Version)"
            UpgradeCode="b1e5a6c2-4a1f-4ad3-9c7a-4f1a8e2b9a01"
            Scope="perMachine">
