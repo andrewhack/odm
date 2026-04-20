@@ -76,10 +76,10 @@ def get_stream_uri(
     stream: str = "RTP-Unicast",
 ) -> str:
     """Return the RTSP URI for a given profile token."""
-    resp = sess.media.GetStreamUri(
-        StreamSetup={"Stream": stream, "Transport": {"Protocol": protocol}},
-        ProfileToken=profile_token,
-    )
+    resp = sess.media.GetStreamUri({
+        "StreamSetup": {"Stream": stream, "Transport": {"Protocol": protocol}},
+        "ProfileToken": profile_token,
+    })
     return str(resp.Uri)
 
 
@@ -91,7 +91,7 @@ def get_snapshot_uri(sess: DeviceSession, profile_token: str) -> str | None:
     import logging
     log = logging.getLogger(__name__)
     try:
-        resp = sess.media.GetSnapshotUri(ProfileToken=profile_token)
+        resp = sess.media.GetSnapshotUri({"ProfileToken": profile_token})
     except Exception as e:
         log.info("GetSnapshotUri failed: %s", e)
         return None
@@ -128,10 +128,10 @@ def get_encoder_options(
     import logging
     log = logging.getLogger(__name__)
     try:
-        opts = sess.media.GetVideoEncoderConfigurationOptions(
-            ConfigurationToken=configuration_token,
-            ProfileToken=profile_token,
-        )
+        opts = sess.media.GetVideoEncoderConfigurationOptions({
+            "ConfigurationToken": configuration_token,
+            "ProfileToken": profile_token,
+        })
     except Exception as e:
         log.info("GetVideoEncoderConfigurationOptions failed: %s", e)
         return None
