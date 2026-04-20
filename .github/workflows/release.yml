@@ -48,12 +48,13 @@ jobs:
         run: choco install innosetup -y --no-progress
       - name: build .exe installer
         working-directory: src
-        run: pwsh packaging\exeuild-exe.ps1
+        shell: pwsh
+        run: pwsh ./packaging/exe/build-exe.ps1
       - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: onvifcfg-exe
-          path: src\dist\onvifcfg-setup-*.exe
+          path: src/dist/onvifcfg-setup-*.exe
 
   build-msi:
     runs-on: windows-latest
@@ -69,17 +70,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
       - name: install WiX v4
-        # Pin to 4.x - WiX 5/7 require OSMF EULA acceptance that can't be
-        # given in unattended CI.
         run: dotnet tool install -g wix --version 4.0.6
       - name: build .msi
         working-directory: src
-        run: pwsh packaging\msi\build-msi.ps1
+        shell: pwsh
+        run: pwsh ./packaging/msi/build-msi.ps1
       - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: onvifcfg-msi
-          path: src\dist\*.msi
+          path: src/dist/*.msi
 
   release:
     needs: [build-deb, build-msi, build-exe]
