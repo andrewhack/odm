@@ -30,6 +30,9 @@ if (Test-Path build) { Remove-Item -Recurse -Force build }
 Write-Host ">>> uv sync"
 uv sync --extra build
 
+Write-Host ">>> stamping build info"
+pwsh -File scripts/write_buildinfo.ps1
+
 Write-Host ">>> resolving onvif WSDL directory"
 $finder = @"
 from pathlib import Path
