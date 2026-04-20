@@ -67,6 +67,44 @@ Per-platform packaged installs:
   and the WiX v4 toolset
 
 
+## Windows (MSI / EXE)
+
+Pre-built installers are attached to every GitHub release:
+
+- `onvifcfg-<version>.msi` &mdash; classic Windows Installer (WiX).
+- `onvifcfg-<version>-setup.exe` &mdash; Inno Setup alternative.
+
+### SmartScreen warning
+
+Windows will likely flag the first launch with
+_"Microsoft Defender SmartScreen prevented an unrecognized app from starting"_.
+**The installer is not malicious** &mdash; it is simply not code-signed.
+
+I am not a Windows developer and do not intend to pay Microsoft (nor any
+reseller) for a code-signing certificate just to ship a free tool that
+configures ONVIF cameras on a local network. The signing-certificate
+ecosystem is a rent extraction mechanism I am not interested in feeding.
+
+Workarounds, in order of convenience:
+
+1. **Elevated one-liner** (recommended &mdash; downloads via .NET
+   `WebClient`, which does not tag the file with the Mark-of-the-Web
+   flag SmartScreen checks, so it never triggers the prompt):
+
+   ```powershell
+   irm https://raw.githubusercontent.com/andrewhack/odm/main/packaging/msi/install.ps1 | iex
+   ```
+
+2. **Click through the warning** &mdash; on the SmartScreen dialog click
+   _More info_ &rarr; _Run anyway_. Same binary, one extra click.
+
+3. **Unblock the file manually** &mdash; right-click the downloaded
+   `.msi` / `.exe` &rarr; Properties &rarr; check _Unblock_ &rarr; OK.
+
+If your environment mandates signed binaries, build the MSI yourself from
+source (`pwsh packaging/msi/build-msi.ps1` on the `windows-msi`
+branch) and sign it with your own certificate.
+
 ## Usage — CLI
 
 ```bash
