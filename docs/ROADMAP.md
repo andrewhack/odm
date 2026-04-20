@@ -21,9 +21,12 @@ Shipped in the initial rewrite.
 - All 11 reliability/compatibility fixes from the upstream ODM review
   (see `docs/RELIABILITY_FIXES.md`)
 
-## Phase 2 — device basics
+## Phase 2 — device basics — DONE (core), follow-ups open
 
 Small, low-risk, pure SOAP passthrough. Same pattern as `network.py`.
+Shipped in v0.1.x: device info panel on `/device`, reboot + soft/hard
+factory-reset buttons wired to the existing maintenance module, new
+POST `/action/reboot` and POST `/action/factory-reset` routes.
 
 - **Device info** — Manufacturer / Model / Firmware / Serial / HardwareId
   via `GetDeviceInformation`, `GetSystemDateAndTime`
@@ -36,7 +39,28 @@ Small, low-risk, pure SOAP passthrough. Same pattern as `network.py`.
   non-empty admin on delete, validate password complexity where the device
   advertises a security policy
 
+## Phase 2 follow-ups — pending
+
+Backend modules are in place (`users.py`, `device_info.get_system_date_and_time`)
+but no dedicated UI page yet; these are small follow-up tickets rather
+than blockers on Phase 3:
+
+- **Time settings UI** — form on `/device` to set timezone / NTP-sync
+  flag / manual UTC; wraps `SetSystemDateAndTime`.
+- **Users UI** — table of users, add/delete/change-password buttons
+  wired to the existing `users` module.
+- **Firmware upgrade** — `UpgradeSystemFirmware` with MTOM/HTTP
+  fallback (fix #18 from the review: binary payload handling varies
+  by firmware).
+
 ## Phase 3 — media plane read / edit
+### Phase 3 — in progress
+
+- v0.1.x: read-only profile table on `/device` (name / token /
+  encoding / resolution / fps / bitrate), one RTSP link per
+  profile, `get_encoder_options` helper in place for the edit
+  form landing next.
+
 
 - **Profiles** — `GetProfiles`, add/delete, rename
 - **Video sources** — `GetVideoSources`, `GetVideoSourceConfigurations`,

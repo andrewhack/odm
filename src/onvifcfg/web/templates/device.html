@@ -145,4 +145,35 @@
   <button type="submit">preview changes</button>
 </form>
 
+{% if profiles %}
+<h3 style="margin-top:2em">media profiles</h3>
+<table>
+  <thead>
+    <tr><th>name</th><th>token</th><th>encoder</th><th>resolution</th><th>fps</th><th>bitrate</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for p in profiles %}
+    <tr>
+      <td><strong>{{ p.name }}</strong></td>
+      <td><code>{{ p.token }}</code></td>
+      <td>{{ p.video_encoder.encoding if p.video_encoder else "-" }}</td>
+      <td>
+        {%- if p.video_encoder and p.video_encoder.resolution -%}
+          {{ p.video_encoder.resolution.width }}&times;{{ p.video_encoder.resolution.height }}
+        {%- else -%}-{%- endif -%}
+      </td>
+      <td>{{ p.video_encoder.fps if p.video_encoder and p.video_encoder.fps else "-" }}</td>
+      <td>
+        {%- if p.video_encoder and p.video_encoder.bitrate_kbps -%}
+          {{ p.video_encoder.bitrate_kbps }} kbps
+        {%- else -%}-{%- endif -%}
+      </td>
+      <td><a href="/rtsp/{{ host }}?port={{ port }}&amp;profile={{ p.token }}">rtsp</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted">Read-only view for now; video-encoder edit form lands in the next Phase 3 step.</p>
+{% endif %}
+
 {% endblock %}

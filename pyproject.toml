@@ -29,6 +29,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
+    "imageio-ffmpeg>=0.5",
 ]
 
 [project.scripts]

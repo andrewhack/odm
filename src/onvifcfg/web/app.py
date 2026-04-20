@@ -45,6 +45,21 @@ templates.env.globals["version"] = _pkg_version
 templates.env.globals["git_sha"] = _git_sha
 
 
+def _safe_profiles(sess: DeviceSession) -> list[Any]:
+    """Phase 3 read-only profile listing for the device page.
+
+    Wrapped in a try so a cranky media-service camera (no profiles, bad
+    WSDL, auth only covers device_service) does not break the whole
+    /device render path; the page degrades gracefully to "no profiles".
+    """
+    try:
+        return list(_media.get_profiles(sess))
+    except Exception as e:
+        import logging
+        logging.getLogger("onvifcfg.profiles").info("get_profiles failed: %s", e)
+        return []
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="onvifcfg", openapi_url=None, docs_url=None, redoc_url=None)
 
@@ -94,13 +109,14 @@ def create_app() -> FastAPI:
                 continue
             _creds.remember(host, user, password)
             info = _dev.get_device_info(sess) if _dev else None
+            profiles = _safe_profiles(sess)
             return templates.TemplateResponse(
                 request=request,
                 name="device.html",
                 context={
                     "request": request,
                     "host": host, "port": port, "user": user, "password": password,
-                    "state": state, "info": info,
+                    "state": state, "info": info, "profiles": profiles,
                     "auto_login_note": f"auto-logged in as '{user or '(anonymous)'}'",
                 },
             )
@@ -140,13 +156,14 @@ def create_app() -> FastAPI:
             )
         _creds.remember(host, user, password)
         info = _dev.get_device_info(sess) if _dev else None
+        profiles = _safe_profiles(sess)
         return templates.TemplateResponse(
             request=request,
             name="device.html",
             context={
                 "request": request,
                 "host": host, "port": port, "user": user, "password": password,
-                "state": state, "info": info,
+                "state": state, "info": info, "profiles": profiles,
             },
         )
 
@@ -301,12 +318,21 @@ def create_app() -> FastAPI:
                 attempts.append(f"{label}: GetSnapshotUri threw ({e})")
                 uri = None
             # Fallback path: camera has no GetSnapshotUri but serves RTSP.
-            # Grab one frame with ffmpeg if the binary is on PATH.
+            # Grab one frame with ffmpeg.  Prefer the imageio-ffmpeg bundled
+            # binary (ships inside the MSI/EXE/DEB) so this works without
+            # the user installing ffmpeg separately; fall back to PATH.
             if not uri:
                 import shutil, subprocess
-                ffmpeg = shutil.which("ffmpeg")
+                ffmpeg = None
+                try:
+                    import imageio_ffmpeg as _iio
+                    ffmpeg = _iio.get_ffmpeg_exe()
+                except Exception as e:
+                    attempts.append(f"{label}: imageio_ffmpeg unavailable ({e})")
                 if not ffmpeg:
-                    attempts.append(f"{label}: no snapshot URI and ffmpeg not found on PATH")
+                    ffmpeg = shutil.which("ffmpeg")
+                if not ffmpeg:
+                    attempts.append(f"{label}: no snapshot URI and ffmpeg not found")
                     continue
                 try:
                     rtsp = _media.uri_with_credentials(
@@ -363,13 +389,19 @@ def create_app() -> FastAPI:
         return Response(status_code=404, content=b"", media_type="image/jpeg")
 
     @app.get("/rtsp/{host}", response_class=HTMLResponse)
-    def rtsp_link(request: Request, host: str, port: int = 80) -> Any:
+    def rtsp_link(
+        request: Request, host: str, port: int = 80, profile: str = ""
+    ) -> Any:
         """Return a page showing the RTSP stream URI for a camera.
 
         Uses cached credentials (same as the snapshot endpoint) to open an
-        ONVIF session, fetch the first profile's stream URI, and render it
-        with a copy button and a VLC launch hint.  404-equivalent page if
-        no cached creds work.
+        ONVIF session, fetch the requested (or first) profile's stream URI,
+        and render it with a copy button and a VLC launch hint.
+        404-equivalent page if no cached creds work.
+
+        The ``profile`` query-string selects which media profile to pull
+        the RTSP URI from; defaults to the first profile if omitted or
+        unknown on this device.
         """
         for user, password in _creds.candidates(host):
             try:
@@ -379,8 +411,9 @@ def create_app() -> FastAPI:
                 continue
             if not profs:
                 continue
+            chosen = next((p for p in profs if p.token == profile), profs[0])
             try:
-                uri = _media.get_stream_uri(sess, profs[0].token)
+                uri = _media.get_stream_uri(sess, chosen.token)
             except Exception:
                 continue
             with_creds = _media.uri_with_credentials(uri, user, password)
@@ -392,7 +425,7 @@ def create_app() -> FastAPI:
                     "request": request,
                     "host": host,
                     "port": port,
-                    "profile_name": profs[0].name or profs[0].token,
+                    "profile_name": chosen.name or chosen.token,
                     "uri": uri,
                     "uri_with_creds": with_creds,
                 },

@@ -1,4 +1,8 @@
-"""Build-time metadata (regenerated on every build)."""
+"""Build-time metadata.
 
-GIT_SHA = "2291aef"
-BUILD_TIME = "2026-04-20T20:07:44Z"
+Rewritten by build-{deb,msi,exe}.sh before PyInstaller runs.  Dev-mode
+defaults are fine when running from source (``uv run onvifcfg``).
+"""
+
+GIT_SHA = "dev"
+BUILD_TIME = "unknown"
