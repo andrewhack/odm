@@ -1,62 +1,67 @@
 # Windows MSI packaging
 
-This branch adds Windows MSI packaging on top of the core Python source
-on `main`. The MSI bundles a self-contained PyInstaller `onvifcfg.exe`
-— installed systems do **not** need Python 3.11+ on the path.
+This branch produces a Windows MSI installer for `onvifcfg`.
 
-## Build
+## Install (recommended — bypasses Defender SmartScreen)
 
-From an elevated PowerShell 7+ prompt on Windows:
+Open **PowerShell as Administrator** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/andrewhack/odm/main/packaging/msi/install.ps1 | iex
+```
+
+This downloads the MSI via .NET `WebClient` (which does not tag the file
+with a `Zone.Identifier` Alternate Data Stream) and runs msiexec directly,
+so Defender SmartScreen never engages. The MSI itself is the same artifact
+you'd get from the [releases page](https://github.com/andrewhack/odm/releases).
+
+To uninstall:
+
+```powershell
+irm https://raw.githubusercontent.com/andrewhack/odm/main/packaging/msi/install.ps1 | iex -Uninstall
+```
+
+## Install (manual — hits SmartScreen)
+
+If you'd rather download from the browser, Defender SmartScreen will block
+the unsigned MSI with "Microsoft Defender SmartScreen prevented an
+unrecognized app from starting". Two ways through:
+
+- **Unblock the file**: right-click the downloaded `.msi` → Properties →
+  tick "Unblock" → OK. Then double-click to install.
+- **Bypass on the dialog**: click "More info" on the SmartScreen popup →
+  "Run anyway".
+
+## Why isn't the MSI signed?
+
+Authenticode signing doesn't fully remove SmartScreen — Microsoft uses a
+separate download-reputation system. Options we've evaluated are tracked
+in [docs/ROADMAP.md](../../docs/ROADMAP.md#msi-code-signing-defender-smartscreen-workaround):
+
+- **End-user `install.ps1`** (done — recommended)
+- **SignPath.io OSS program** (free, TBD)
+- **Azure Trusted Signing** (~$10/month, cleanest UX)
+- **EV Code Signing certificate** (~$300-700/year, instant reputation)
+
+The build script has a hook: if the repo's GitHub Secrets contain
+`MSI_SIGNING_PFX_BASE64` and `MSI_SIGNING_PFX_PASSWORD`, `build-msi.ps1`
+will sign the MSI with `signtool.exe` and also export the public
+certificate as `dist/onvifcfg.cer` for users who want to import it into
+their Trusted Publishers store. Unsigned builds still work.
+
+## Build from source
+
+Requires Python 3.11+, `uv`, and WiX v4 (`dotnet tool install -g wix --version 4.0.6`):
 
 ```powershell
 pwsh packaging\msi\build-msi.ps1
 ```
 
-Produces `dist\onvifcfg-<version>.msi`.
-
-## Build-host requirements
-
-- **Python 3.11+** on PATH
-- **uv** — <https://docs.astral.sh/uv/>
-- **.NET SDK 6+** and the **WiX v4 toolset**:
-  ```powershell
-  dotnet tool install -g wix
-  ```
-
-## Install
-
-Double-click the MSI, or silently:
-
-```powershell
-msiexec /i dist\onvifcfg-<version>.msi /qn
-```
-
-Installs to `%ProgramFiles%\onvifcfg\onvifcfg.exe` and adds that
-directory to the system PATH. Open a new terminal and run `onvifcfg --help`.
-
-## Uninstall
-
-Control Panel → Apps → onvifcfg → Uninstall, or:
-
-```powershell
-msiexec /x dist\onvifcfg-<version>.msi /qn
-```
+Output: `dist/onvifcfg-<version>.msi` (and `dist/onvifcfg.cer` if signed).
 
 ## CI
 
-```yaml
-name: build-msi
-on: { push: { tags: ['v*'] } }
-jobs:
-  msi:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: '8.0.x' }
-      - run: dotnet tool install -g wix
-      - run: pwsh packaging\msi\build-msi.ps1
-      - uses: actions/upload-artifact@v4
-        with: { name: msi, path: dist\*.msi }
-```
+`.github/workflows/release.yml` on the `main` branch builds this MSI on a
+`windows-latest` runner for every `v*` tag and publishes it as a release
+asset. See the workflow for the `windows-latest` SDK + uv + WiX install
+steps.
