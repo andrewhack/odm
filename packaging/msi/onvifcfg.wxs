@@ -17,7 +17,7 @@
            UpgradeCode="b1e5a6c2-4a1f-4ad3-9c7a-4f1a8e2b9a01"
            Scope="perMachine">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of onvifcfg is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of onvifcfg is already installed." />
 
     <MediaTemplate EmbedCab="yes" />
 
