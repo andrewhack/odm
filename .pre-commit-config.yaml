@@ -12,6 +12,8 @@ repos:
         args: ["--maxkb=1024"]
       - id: mixed-line-ending
         args: ["--fix=lf"]
+        # PowerShell / cmd scripts keep CRLF per .gitattributes.
+        exclude: '\.(ps1|bat|cmd)$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.11

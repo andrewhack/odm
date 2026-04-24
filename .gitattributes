@@ -1,0 +1,26 @@
+# Pin line endings to LF in the repo regardless of platform.
+# Fixes pre-commit mixed-line-ending vs core.autocrlf=true fight on Windows.
+
+* text=auto eol=lf
+
+# Windows-native scripts keep CRLF so PowerShell reads them without surprises.
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Binary assets - never touch.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.xz    binary
+*.deb   binary
+*.msi   binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
