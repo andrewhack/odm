@@ -18,9 +18,9 @@ from __future__ import annotations
 import json
 import os
 import platform
+from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
-from typing import Iterable
 
 _lock = Lock()
 
@@ -60,6 +60,7 @@ def _save(data: dict[str, list[list[str]]]) -> None:
         tmp.replace(p)
     except OSError as e:
         import sys
+
         print(f"[creds-cache] save failed to {p}: {e}", file=sys.stderr, flush=True)
 
 
@@ -74,9 +75,11 @@ def remember(host: str, user: str, password: str) -> None:
         data[host] = entries[:10]
         _save(data)
     import sys
+
     print(
         f"[creds-cache] remember host={host} user={user or '(anon)'} (cache at {_cache_path()})",
-        file=sys.stderr, flush=True,
+        file=sys.stderr,
+        flush=True,
     )
 
 
@@ -120,7 +123,6 @@ def forget(host: str | None = None) -> None:
         else:
             data.pop(host, None)
         _save(data)
-
 
 
 def known(host: str) -> bool:

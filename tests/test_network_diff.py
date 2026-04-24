@@ -25,9 +25,7 @@ def _baseline() -> NetworkState:
             NetworkInterface(
                 token="eth0",
                 enabled=True,
-                ipv4=IPv4Config(
-                    dhcp=False, address=IPv4Address("192.168.1.10"), prefix_length=24
-                ),
+                ipv4=IPv4Config(dhcp=False, address=IPv4Address("192.168.1.10"), prefix_length=24),
             ),
         ),
         hostname=Hostname(name="cam01", from_dhcp=False),

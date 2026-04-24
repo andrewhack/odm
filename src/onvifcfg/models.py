@@ -92,7 +92,7 @@ class Gateway(BaseModel):
     ipv6: tuple[IPv6Address, ...] = ()
 
     @classmethod
-    def parse(cls, addresses: list[str]) -> "Gateway":
+    def parse(cls, addresses: list[str]) -> Gateway:
         v4: list[IPv4Address] = []
         v6: list[IPv6Address] = []
         for raw in addresses:

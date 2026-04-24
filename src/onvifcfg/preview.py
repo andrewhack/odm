@@ -37,17 +37,23 @@ def spawn_ffplay(stream_uri: str, *, title: str | None = None) -> subprocess.Pop
         )
     cmd = [
         binary,
-        "-loglevel", "warning",
-        "-fflags", "nobuffer",
-        "-rtsp_transport", "tcp",
-        "-window_title", title or "onvifcfg preview",
+        "-loglevel",
+        "warning",
+        "-fflags",
+        "nobuffer",
+        "-rtsp_transport",
+        "tcp",
+        "-window_title",
+        title or "onvifcfg preview",
         stream_uri,
     ]
-    log.info("launching ffplay: %s", " ".join(cmd[:3] + ["..."]))
+    log.info("launching ffplay: %s", " ".join([*cmd[:3], "..."]))
     return subprocess.Popen(cmd)
 
 
-def save_snapshot(snapshot_uri: str, output_path: Path, *, user: str | None = None, password: str | None = None) -> Path:
+def save_snapshot(
+    snapshot_uri: str, output_path: Path, *, user: str | None = None, password: str | None = None
+) -> Path:
     """Download a single JPEG snapshot to disk. Returns the output path.
 
     Uses urllib with basic auth; some cameras allow anonymous snapshots,
@@ -64,7 +70,10 @@ def save_snapshot(snapshot_uri: str, output_path: Path, *, user: str | None = No
             urllib.request.HTTPBasicAuthHandler(pm),
             urllib.request.HTTPDigestAuthHandler(pm),
         )
-    with (opener.open(req) if opener else urllib.request.urlopen(req)) as r, output_path.open("wb") as out:
+    with (
+        opener.open(req) if opener else urllib.request.urlopen(req) as r,
+        output_path.open("wb") as out,
+    ):
         while True:
             chunk = r.read(64 * 1024)
             if not chunk:

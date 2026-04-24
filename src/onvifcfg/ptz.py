@@ -56,13 +56,15 @@ def continuous_move(
     Passing a zero vector is equivalent to ``stop()``.
     """
     _check_speed(velocity)
-    sess.ptz.ContinuousMove({
-        "ProfileToken": profile_token,
-        "Velocity": {
-            "PanTilt": {"x": velocity.pan, "y": velocity.tilt},
-            "Zoom": {"x": velocity.zoom},
-        },
-    })
+    sess.ptz.ContinuousMove(
+        {
+            "ProfileToken": profile_token,
+            "Velocity": {
+                "PanTilt": {"x": velocity.pan, "y": velocity.tilt},
+                "Zoom": {"x": velocity.zoom},
+            },
+        }
+    )
     if duration_s is not None:
         time.sleep(duration_s)
         stop(sess, profile_token)

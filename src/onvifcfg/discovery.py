@@ -29,7 +29,9 @@ def discover(timeout_s: float = 3.0) -> list[DiscoveredDevice]:
     # installed on a machine that only needs the show/apply commands.
     try:
         from wsdiscovery import QName  # type: ignore[import-untyped]
-        from wsdiscovery.discovery import ThreadedWSDiscovery as WSDiscovery  # type: ignore[import-untyped]
+        from wsdiscovery.discovery import (
+            ThreadedWSDiscovery as WSDiscovery,  # type: ignore[import-untyped]
+        )
     except ImportError as e:  # pragma: no cover
         raise RuntimeError(
             "WS-Discovery requires the 'wsdiscovery' package (pip install wsdiscovery)"

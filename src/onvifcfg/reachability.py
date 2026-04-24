@@ -26,7 +26,7 @@ def wait_for_port(
         try:
             with socket.create_connection((host_str, port), timeout=connect_timeout_s):
                 return True
-        except (OSError, socket.timeout):
+        except (TimeoutError, OSError):
             pass
         time.sleep(poll_interval_s)
     return False

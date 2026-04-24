@@ -51,7 +51,10 @@ def read_state(sess: DeviceSession) -> NetworkState:
 
     gw_raw = sess.call("GetNetworkDefaultGateway")
     gateway = Gateway.parse(
-        [*(getattr(gw_raw, "IPv4Address", None) or []), *(getattr(gw_raw, "IPv6Address", None) or [])]
+        [
+            *(getattr(gw_raw, "IPv4Address", None) or []),
+            *(getattr(gw_raw, "IPv6Address", None) or []),
+        ]
     )
 
     dns_raw = sess.call("GetDNS")
@@ -78,7 +81,9 @@ def read_state(sess: DeviceSession) -> NetworkState:
                 enabled=bool(zc_raw.Enabled),
                 interface_token=getattr(zc_raw, "InterfaceToken", None),
                 addresses=tuple(
-                    ip for ip in (_parse_ipv4(a) for a in (getattr(zc_raw, "Addresses", None) or [])) if ip is not None
+                    ip
+                    for ip in (_parse_ipv4(a) for a in (getattr(zc_raw, "Addresses", None) or []))
+                    if ip is not None
                 ),
             )
         else:
@@ -168,9 +173,7 @@ def _parse_interface(nic: object) -> NetworkInterface:
 def _parse_dns(dns_raw: object) -> DNSInfo:
     from_dhcp = bool(getattr(dns_raw, "FromDHCP", False))
     servers_raw = (
-        getattr(dns_raw, "DNSFromDHCP", None)
-        if from_dhcp
-        else getattr(dns_raw, "DNSManual", None)
+        getattr(dns_raw, "DNSFromDHCP", None) if from_dhcp else getattr(dns_raw, "DNSManual", None)
     ) or []
     servers: list[IPv4Address | IPv6Address] = []
     for s in servers_raw:
@@ -193,9 +196,7 @@ def _parse_dns(dns_raw: object) -> DNSInfo:
 def _parse_ntp(ntp_raw: object) -> NTPInfo:
     from_dhcp = bool(getattr(ntp_raw, "FromDHCP", False))
     src = (
-        getattr(ntp_raw, "NTPFromDHCP", None)
-        if from_dhcp
-        else getattr(ntp_raw, "NTPManual", None)
+        getattr(ntp_raw, "NTPFromDHCP", None) if from_dhcp else getattr(ntp_raw, "NTPManual", None)
     ) or []
     servers: list[str] = []
     for h in src:
@@ -270,9 +271,10 @@ def compute_diff(state: NetworkState, patch: NetworkPatch) -> Diff:
 
     if patch.ip is not None and (cur_ipv4 is None or cur_ipv4.address != patch.ip):
         d.ip_changed = True
-    if patch.subnet_mask is not None:
-        if cur_ipv4 is None or cur_ipv4.subnet_mask != patch.subnet_mask:
-            d.subnet_changed = True
+    if patch.subnet_mask is not None and (
+        cur_ipv4 is None or cur_ipv4.subnet_mask != patch.subnet_mask
+    ):
+        d.subnet_changed = True
     if patch.dhcp is not None and (cur_ipv4 is None or cur_ipv4.dhcp != patch.dhcp):
         d.dhcp_changed = True
 
@@ -291,7 +293,10 @@ def compute_diff(state: NetworkState, patch: NetworkPatch) -> Diff:
 
     if patch.hostname is not None and patch.hostname != state.hostname.name:
         d.hostname_changed = True
-    if patch.use_hostname_from_dhcp is not None and patch.use_hostname_from_dhcp != state.hostname.from_dhcp:
+    if (
+        patch.use_hostname_from_dhcp is not None
+        and patch.use_hostname_from_dhcp != state.hostname.from_dhcp
+    ):
         d.hostname_changed = True
 
     # fix #13 - per-protocol change detection, only changed go in SetNetworkProtocols
@@ -532,7 +537,9 @@ def _apply_ip(sess: DeviceSession, state: NetworkState, patch: NetworkPatch) -> 
         prefix = (
             _mask_to_prefix(mask)
             if mask is not None
-            else (nic.ipv4.prefix_length if nic.ipv4 and nic.ipv4.prefix_length is not None else None)
+            else (
+                nic.ipv4.prefix_length if nic.ipv4 and nic.ipv4.prefix_length is not None else None
+            )
         )
         if ip is not None and prefix is not None:
             manual.append({"Address": str(ip), "PrefixLength": prefix})
@@ -563,7 +570,9 @@ def _best_effort_reboot(sess: DeviceSession) -> None:
     try:
         sess.call("SystemReboot")
     except Exception as e:
-        log.info("SystemReboot returned/raised after %.1fs (expected): %s", time.monotonic() - start, e)
+        log.info(
+            "SystemReboot returned/raised after %.1fs (expected): %s", time.monotonic() - start, e
+        )
 
 
 def _mask_to_prefix(mask: IPv4Address) -> int:

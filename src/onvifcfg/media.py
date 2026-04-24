@@ -8,7 +8,6 @@ imaging adjust) are staged for Phase 3 continuation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 from urllib.parse import quote, urlparse, urlunparse
 
 from .session import DeviceSession
@@ -76,10 +75,12 @@ def get_stream_uri(
     stream: str = "RTP-Unicast",
 ) -> str:
     """Return the RTSP URI for a given profile token."""
-    resp = sess.media.GetStreamUri({
-        "StreamSetup": {"Stream": stream, "Transport": {"Protocol": protocol}},
-        "ProfileToken": profile_token,
-    })
+    resp = sess.media.GetStreamUri(
+        {
+            "StreamSetup": {"Stream": stream, "Transport": {"Protocol": protocol}},
+            "ProfileToken": profile_token,
+        }
+    )
     return str(resp.Uri)
 
 
@@ -89,6 +90,7 @@ def get_snapshot_uri(sess: DeviceSession, profile_token: str) -> str | None:
     when it implements GetStreamUri).
     """
     import logging
+
     log = logging.getLogger(__name__)
     try:
         resp = sess.media.GetSnapshotUri({"ProfileToken": profile_token})
@@ -126,12 +128,15 @@ def get_encoder_options(
     the device refuses or returns a malformed response.
     """
     import logging
+
     log = logging.getLogger(__name__)
     try:
-        opts = sess.media.GetVideoEncoderConfigurationOptions({
-            "ConfigurationToken": configuration_token,
-            "ProfileToken": profile_token,
-        })
+        opts = sess.media.GetVideoEncoderConfigurationOptions(
+            {
+                "ConfigurationToken": configuration_token,
+                "ProfileToken": profile_token,
+            }
+        )
     except Exception as e:
         log.info("GetVideoEncoderConfigurationOptions failed: %s", e)
         return None
@@ -146,9 +151,13 @@ def get_encoder_options(
         or getattr(opts, "JPEG", None)
         or getattr(opts, "MPEG4", None)
     )
-    encoding = "H264" if getattr(opts, "H264", None) else (
-        "H265" if getattr(opts, "H265", None) else (
-            "JPEG" if getattr(opts, "JPEG", None) else "MPEG4"
+    encoding = (
+        "H264"
+        if getattr(opts, "H264", None)
+        else (
+            "H265"
+            if getattr(opts, "H265", None)
+            else ("JPEG" if getattr(opts, "JPEG", None) else "MPEG4")
         )
     )
     resolutions: tuple[Resolution, ...] = ()
@@ -157,9 +166,7 @@ def get_encoder_options(
     bitrate_range: tuple[int, int] | None = None
     if block is not None:
         rlist = getattr(block, "ResolutionsAvailable", None) or []
-        resolutions = tuple(
-            Resolution(int(r.Width), int(r.Height)) for r in rlist
-        )
+        resolutions = tuple(Resolution(int(r.Width), int(r.Height)) for r in rlist)
         fps_range = getattr(block, "FrameRateRange", None)
         if fps_range is not None:
             lo, hi = int(fps_range.Min), int(fps_range.Max)

@@ -29,6 +29,7 @@ def _resolve_wsdl_dir() -> str:
     """
     try:
         from importlib.resources import files
+
         candidate = str(files("onvif") / "wsdl")
         if os.path.isdir(candidate):
             return candidate
@@ -42,6 +43,7 @@ def _resolve_wsdl_dir() -> str:
             return candidate
     # Last resort - let onvif-zeep try its own resolution
     import onvif as _onvif
+
     pkg_dir = os.path.dirname(os.path.abspath(_onvif.__file__))
     candidate = os.path.join(pkg_dir, "wsdl")
     if os.path.isdir(candidate):
@@ -70,7 +72,10 @@ class DeviceSession:
     ) -> None:
         try:
             self._cam = ONVIFCamera(
-                host, port, creds.user, creds.password,
+                host,
+                port,
+                creds.user,
+                creds.password,
                 wsdl_dir or _resolve_wsdl_dir(),
             )
         except Exception as e:

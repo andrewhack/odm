@@ -36,9 +36,10 @@ _here = Path(__file__).parent
 templates = Jinja2Templates(directory=str(_here / "templates"))
 
 # Inject build metadata so every template can render it in the footer.
-from .. import __version__ as _pkg_version
+from .. import __version__ as _pkg_version  # noqa: E402
+
 try:
-    from .._buildinfo import GIT_SHA as _git_sha
+    from .._buildinfo import GIT_SHA as _git_sha  # noqa: N811
 except Exception:
     _git_sha = "dev"
 templates.env.globals["version"] = _pkg_version
@@ -56,6 +57,7 @@ def _safe_profiles(sess: DeviceSession) -> list[Any]:
         return list(_media.get_profiles(sess))
     except Exception as e:
         import logging
+
         logging.getLogger("onvifcfg.profiles").info("get_profiles failed: %s", e)
         return []
 
@@ -66,6 +68,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     def _on_error(request, exc):  # type: ignore[no-untyped-def]
         import traceback
+
         tb = traceback.format_exc()
         return HTMLResponse(
             "<h2>onvifcfg internal error</h2><pre>" + tb.replace("<", "&lt;") + "</pre>",
@@ -84,13 +87,15 @@ def create_app() -> FastAPI:
                     u = urlparse(d.best_xaddr())
                     hostname = u.hostname or ""
                     ip = _to_ipv4(hostname)
-                    devices.append({
-                        "host": ip,
-                        "name": _reverse_dns(ip) or "",
-                        "port": u.port or 80,
-                        "xaddr": d.best_xaddr(),
-                        "authed": _creds.known(ip),
-                    })
+                    devices.append(
+                        {
+                            "host": ip,
+                            "name": _reverse_dns(ip) or "",
+                            "port": u.port or 80,
+                            "xaddr": d.best_xaddr(),
+                            "authed": _creds.known(ip),
+                        }
+                    )
             except Exception as e:
                 error = f"discovery failed: {e}"
         return templates.TemplateResponse(
@@ -115,8 +120,13 @@ def create_app() -> FastAPI:
                 name="device.html",
                 context={
                     "request": request,
-                    "host": host, "port": port, "user": user, "password": password,
-                    "state": state, "info": info, "profiles": profiles,
+                    "host": host,
+                    "port": port,
+                    "user": user,
+                    "password": password,
+                    "state": state,
+                    "info": info,
+                    "profiles": profiles,
                     "auto_login_note": f"auto-logged in as '{user or '(anonymous)'}'",
                 },
             )
@@ -140,7 +150,12 @@ def create_app() -> FastAPI:
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
-                context={"request": request, "error": f"session error: {e}", "devices": [], "timeout": 3.0},
+                context={
+                    "request": request,
+                    "error": f"session error: {e}",
+                    "devices": [],
+                    "timeout": 3.0,
+                },
             )
         # Session constructor succeeded - but read_state makes the first
         # real SOAP call which can still raise an auth fault.  If the auth
@@ -152,7 +167,12 @@ def create_app() -> FastAPI:
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
-                context={"request": request, "error": f"session error: {e}", "devices": [], "timeout": 3.0},
+                context={
+                    "request": request,
+                    "error": f"session error: {e}",
+                    "devices": [],
+                    "timeout": 3.0,
+                },
             )
         _creds.remember(host, user, password)
         info = _dev.get_device_info(sess) if _dev else None
@@ -162,8 +182,13 @@ def create_app() -> FastAPI:
             name="device.html",
             context={
                 "request": request,
-                "host": host, "port": port, "user": user, "password": password,
-                "state": state, "info": info, "profiles": profiles,
+                "host": host,
+                "port": port,
+                "user": user,
+                "password": password,
+                "state": state,
+                "info": info,
+                "profiles": profiles,
             },
         )
 
@@ -218,7 +243,12 @@ def create_app() -> FastAPI:
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
-                context={"request": request, "error": f"session error: {e}", "devices": [], "timeout": 3.0},
+                context={
+                    "request": request,
+                    "error": f"session error: {e}",
+                    "devices": [],
+                    "timeout": 3.0,
+                },
             )
 
         diff = compute_diff(state, patch)
@@ -230,15 +260,21 @@ def create_app() -> FastAPI:
             )
 
         try:
-            warnings = _validate(state, patch, client_ip=IPv4Address(client_ip) if client_ip else None)
+            warnings = _validate(
+                state, patch, client_ip=IPv4Address(client_ip) if client_ip else None
+            )
         except ValidationError as e:
             return templates.TemplateResponse(
                 request=request,
                 name="device.html",
                 context={
                     "request": request,
-                    "host": host, "port": port, "user": user, "password": password,
-                    "state": state, "error": f"validation failed: {e}",
+                    "host": host,
+                    "port": port,
+                    "user": user,
+                    "password": password,
+                    "state": state,
+                    "error": f"validation failed: {e}",
                 },
             )
 
@@ -248,16 +284,32 @@ def create_app() -> FastAPI:
                 name="confirm.html",
                 context={
                     "request": request,
-                    "host": host, "port": port, "user": user, "password": password,
-                    "state": state, "patch": patch, "diff": diff, "warnings": warnings,
+                    "host": host,
+                    "port": port,
+                    "user": user,
+                    "password": password,
+                    "state": state,
+                    "patch": patch,
+                    "diff": diff,
+                    "warnings": warnings,
                     "form_values": _form_dump(
-                        ip=ip, subnet=subnet, gateway=gateway, dns=dns, ntp=ntp,
-                        hostname=hostname, hostname_from_dhcp=hostname_from_dhcp,
-                        http_port=http_port, http_enabled=http_enabled,
-                        https_port=https_port, https_enabled=https_enabled,
-                        rtsp_port=rtsp_port, rtsp_enabled=rtsp_enabled,
+                        ip=ip,
+                        subnet=subnet,
+                        gateway=gateway,
+                        dns=dns,
+                        ntp=ntp,
+                        hostname=hostname,
+                        hostname_from_dhcp=hostname_from_dhcp,
+                        http_port=http_port,
+                        http_enabled=http_enabled,
+                        https_port=https_port,
+                        https_enabled=https_enabled,
+                        rtsp_port=rtsp_port,
+                        rtsp_enabled=rtsp_enabled,
                         zero_config_enabled=zero_config_enabled,
-                        discovery_mode=discovery_mode, client_ip=client_ip, dhcp=dhcp,
+                        discovery_mode=discovery_mode,
+                        client_ip=client_ip,
+                        dhcp=dhcp,
                     ),
                 },
             )
@@ -268,7 +320,12 @@ def create_app() -> FastAPI:
             return templates.TemplateResponse(
                 request=request,
                 name="result.html",
-                context={"request": request, "error": f"apply failed: {e}", "host": host, "port": port},
+                context={
+                    "request": request,
+                    "error": f"apply failed: {e}",
+                    "host": host,
+                    "port": port,
+                },
             )
         return templates.TemplateResponse(
             request=request,
@@ -279,11 +336,13 @@ def create_app() -> FastAPI:
     @app.get("/snapshot/{host}.jpg")
     def snapshot(host: str, port: int = 80) -> Response:
         import sys
+
         cands = _creds.candidates(host)
         print(
             f"[snapshot {host}:{port}] trying {len(cands)} candidate(s): "
             + ", ".join(u or "(anon)" for u, _ in cands),
-            file=sys.stderr, flush=True,
+            file=sys.stderr,
+            flush=True,
         )
         """JPEG snapshot using cached creds with auth + no-auth + RTSP fallback.
 
@@ -300,7 +359,10 @@ def create_app() -> FastAPI:
         every snapshot look broken whenever the right cred was not the
         first one in the list.
         """
-        import logging, urllib.error, urllib.request
+        import logging
+        import urllib.error
+        import urllib.request
+
         log = logging.getLogger("onvifcfg.snapshot")
         attempts: list[str] = []
         # First authenticated (user, password, profile_token) - for the
@@ -344,7 +406,8 @@ def create_app() -> FastAPI:
                         data = r.read()
                     _creds.remember(host, user, password)
                     return Response(
-                        content=data, media_type="image/jpeg",
+                        content=data,
+                        media_type="image/jpeg",
                         headers={"Cache-Control": "no-store"},
                     )
                 except urllib.error.HTTPError as he:
@@ -360,10 +423,13 @@ def create_app() -> FastAPI:
         # wrong-credential stalls.
         if rtsp_fallback is not None:
             f_user, f_password, prof_token = rtsp_fallback
-            import shutil, subprocess
+            import shutil
+            import subprocess
+
             ffmpeg = None
             try:
                 import imageio_ffmpeg as _iio
+
                 ffmpeg = _iio.get_ffmpeg_exe()
                 attempts.append(f"ffmpeg=imageio_ffmpeg:{ffmpeg}")
             except Exception as e:
@@ -376,7 +442,8 @@ def create_app() -> FastAPI:
                 rtsp = "<not resolved>"
                 try:
                     sess = DeviceSession(
-                        host, port,
+                        host,
+                        port,
                         Credentials(user=f_user, password=f_password),
                     )
                     stream = _media.get_stream_uri(sess, prof_token)
@@ -384,29 +451,46 @@ def create_app() -> FastAPI:
                     # Log the RTSP URI we are about to hand ffmpeg - without
                     # the password, so the stderr trace is safe to share.
                     from urllib.parse import urlparse, urlunparse
+
                     p = urlparse(rtsp)
                     safe_netloc = p.hostname or ""
                     if p.port:
                         safe_netloc = f"{safe_netloc}:{p.port}"
                     if p.username:
                         safe_netloc = f"{p.username}:***@{safe_netloc}"
-                    attempts.append(f"rtsp={urlunparse((p.scheme, safe_netloc, p.path, '', '', ''))}")
+                    attempts.append(
+                        f"rtsp={urlunparse((p.scheme, safe_netloc, p.path, '', '', ''))}"
+                    )
                     proc = subprocess.run(
-                        [ffmpeg, "-hide_banner", "-loglevel", "error",
-                         "-rtsp_transport", "tcp", "-i", rtsp,
-                         "-vframes", "1", "-f", "mjpeg", "-"],
-                        capture_output=True, timeout=15,
+                        [
+                            ffmpeg,
+                            "-hide_banner",
+                            "-loglevel",
+                            "error",
+                            "-rtsp_transport",
+                            "tcp",
+                            "-i",
+                            rtsp,
+                            "-vframes",
+                            "1",
+                            "-f",
+                            "mjpeg",
+                            "-",
+                        ],
+                        capture_output=True,
+                        timeout=15,
                     )
                     if proc.returncode == 0 and proc.stdout:
                         _creds.remember(host, f_user, f_password)
                         attempts.append(f"ffmpeg OK, {len(proc.stdout)} bytes")
                         print(
-                            f"[snapshot {host}:{port}] OK via ffmpeg "
-                            f"({len(proc.stdout)} bytes)",
-                            file=sys.stderr, flush=True,
+                            f"[snapshot {host}:{port}] OK via ffmpeg ({len(proc.stdout)} bytes)",
+                            file=sys.stderr,
+                            flush=True,
                         )
                         return Response(
-                            content=proc.stdout, media_type="image/jpeg",
+                            content=proc.stdout,
+                            media_type="image/jpeg",
                             headers={"Cache-Control": "no-store"},
                         )
                     tail = (proc.stderr or b"")[-400:].decode("utf-8", "replace").strip()
@@ -431,9 +515,7 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/rtsp/{host}", response_class=HTMLResponse)
-    def rtsp_link(
-        request: Request, host: str, port: int = 80, profile: str = ""
-    ) -> Any:
+    def rtsp_link(request: Request, host: str, port: int = 80, profile: str = "") -> Any:
         """Return a page showing the RTSP stream URI for a camera.
 
         Uses cached credentials (same as the snapshot endpoint) to open an
@@ -446,6 +528,7 @@ def create_app() -> FastAPI:
         profile when omitted, blank, or not found on this device.
         """
         import sys
+
         attempts: list[str] = []
         for user, password in _creds.candidates(host):
             label = user or "(anon)"
@@ -458,7 +541,9 @@ def create_app() -> FastAPI:
             if not profs:
                 attempts.append(f"{label}: device reports no media profiles")
                 continue
-            chosen = next((p for p in profs if p.token == profile), profs[0]) if profile else profs[0]
+            chosen = (
+                next((p for p in profs if p.token == profile), profs[0]) if profile else profs[0]
+            )
             try:
                 uri = _media.get_stream_uri(sess, chosen.token)
             except Exception as e:
@@ -479,17 +564,15 @@ def create_app() -> FastAPI:
                 },
             )
         print(
-            f"[rtsp {host}:{port}] no cached cred worked; attempts: "
-            + " | ".join(attempts),
-            file=sys.stderr, flush=True,
+            f"[rtsp {host}:{port}] no cached cred worked; attempts: " + " | ".join(attempts),
+            file=sys.stderr,
+            flush=True,
         )
         return templates.TemplateResponse(
             request=request,
             name="rtsp.html",
             context={"request": request, "host": host, "port": port, "error": True},
         )
-
-
 
     @app.post("/action/reboot", response_class=HTMLResponse)
     def action_reboot(
@@ -500,21 +583,32 @@ def create_app() -> FastAPI:
         password: str = Form(...),
     ) -> Any:
         from .. import maintenance as _maint
+
         try:
             sess = DeviceSession(host, port, Credentials(user=user, password=password))
             came_back = _maint.reboot(sess, wait_s=90.0)
         except Exception as e:
             return templates.TemplateResponse(
-                request=request, name="result.html",
-                context={"request": request, "host": host, "port": port, "error": f"reboot failed: {e}"},
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"reboot failed: {e}",
+                },
             )
         return templates.TemplateResponse(
-            request=request, name="result.html",
+            request=request,
+            name="result.html",
             context={
-                "request": request, "host": host, "port": port,
+                "request": request,
+                "host": host,
+                "port": port,
                 "result_msg": (
-                    f"device came back on {host}:{port}" if came_back
-                    else f"reboot requested - device did not answer within 90s"
+                    f"device came back on {host}:{port}"
+                    if came_back
+                    else "reboot requested - device did not answer within 90s"
                 ),
             },
         )
@@ -529,19 +623,31 @@ def create_app() -> FastAPI:
         mode: str = Form("Soft"),
     ) -> Any:
         from .. import maintenance as _maint
+
         m = _maint.FactoryDefault.HARD if mode == "Hard" else _maint.FactoryDefault.SOFT
         try:
             sess = DeviceSession(host, port, Credentials(user=user, password=password))
             _maint.factory_default(sess, m)
         except Exception as e:
             return templates.TemplateResponse(
-                request=request, name="result.html",
-                context={"request": request, "host": host, "port": port, "error": f"factory reset failed: {e}"},
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"factory reset failed: {e}",
+                },
             )
         return templates.TemplateResponse(
-            request=request, name="result.html",
-            context={"request": request, "host": host, "port": port,
-                     "result_msg": f"factory reset requested ({m.value})"},
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": f"factory reset requested ({m.value})",
+            },
         )
 
     return app
@@ -579,6 +685,7 @@ def _to_ipv4(host: str) -> str:
         return host
     try:
         import ipaddress
+
         ipaddress.IPv4Address(host)
         return host
     except ValueError:

@@ -8,25 +8,29 @@ ValidationError instead of silently proceeding.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from ipaddress import IPv4Address, IPv4Network, ip_address
-from typing import Iterable
+from ipaddress import IPv4Address, IPv4Network
 
 from .exceptions import ValidationError
 from .models import NetworkPatch, NetworkState, ProtocolName
 
 
 @dataclass(frozen=True)
-class Warning_:
+class Warning_:  # noqa: N801  # trailing underscore avoids shadowing builtins.Warning
     message: str
 
 
-def _effective_ports(state: NetworkState, patch: NetworkPatch) -> dict[ProtocolName, tuple[bool, tuple[int, ...]]]:
+def _effective_ports(
+    state: NetworkState, patch: NetworkPatch
+) -> dict[ProtocolName, tuple[bool, tuple[int, ...]]]:
     """Merge current state with patch - returns (enabled, ports) per protocol."""
     current = {p.name: (p.enabled, p.port) for p in state.protocols}
     result: dict[ProtocolName, tuple[bool, tuple[int, ...]]] = {}
 
-    def _merge(name: ProtocolName, port_override: int | None, enabled_override: bool | None) -> None:
+    def _merge(
+        name: ProtocolName, port_override: int | None, enabled_override: bool | None
+    ) -> None:
         enabled, ports = current.get(name, (False, ()))
         if port_override is not None:
             ports = (port_override,)
@@ -102,16 +106,25 @@ def validate(
 
     # ----- subnet mask contiguity ------------------------------------------
     if patch.subnet_mask is not None and not _is_contiguous_mask(patch.subnet_mask):
-        raise ValidationError(
-            f"subnet mask {patch.subnet_mask} is not a valid contiguous netmask"
-        )
+        raise ValidationError(f"subnet mask {patch.subnet_mask} is not a valid contiguous netmask")
 
     # ----- gateway plausibility --------------------------------------------
-    effective_ip = patch.ip if patch.ip is not None else (
-        state.primary_interface.ipv4.address if state.primary_interface and state.primary_interface.ipv4 else None
+    effective_ip = (
+        patch.ip
+        if patch.ip is not None
+        else (
+            state.primary_interface.ipv4.address
+            if state.primary_interface and state.primary_interface.ipv4
+            else None
+        )
     )
     effective_mask = patch.subnet_mask
-    if effective_mask is None and state.primary_interface and state.primary_interface.ipv4 and state.primary_interface.ipv4.prefix_length is not None:
+    if (
+        effective_mask is None
+        and state.primary_interface
+        and state.primary_interface.ipv4
+        and state.primary_interface.ipv4.prefix_length is not None
+    ):
         effective_mask = IPv4Address(
             IPv4Network(f"0.0.0.0/{state.primary_interface.ipv4.prefix_length}").netmask
         )

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from ipaddress import IPv4Address, ip_address
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -16,8 +15,8 @@ from . import __version__
 from . import device_info as _dev
 from . import maintenance as _maint
 from . import media as _media
-from . import ptz as _ptz
 from . import preview as _preview
+from . import ptz as _ptz
 from . import users as _users
 from .discovery import discover as _discover
 from .exceptions import OnvifcfgError, ValidationError
@@ -61,7 +60,7 @@ def _open_session(host: str, port: int, user: str, password: str) -> DeviceSessi
         return DeviceSession(host, port, Credentials(user=user, password=password))
     except OnvifcfgError as e:
         console.print(f"[red]session error:[/] {e}")
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from None
 
 
 # -------------------- top-level --------------------
@@ -158,7 +157,9 @@ def factory_reset(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    hard: bool = typer.Option(False, "--hard", help="Also wipe network settings - you will lose the device."),
+    hard: bool = typer.Option(
+        False, "--hard", help="Also wipe network settings - you will lose the device."
+    ),
     yes: bool = typer.Option(False, "--yes", "-y"),
 ) -> None:
     """Reset the device to factory defaults. SOFT keeps network, HARD wipes everything."""
@@ -198,8 +199,10 @@ def time_set(
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
     ntp: bool = typer.Option(False, "--ntp", help="Enable NTP sync."),
-    timezone: Optional[str] = typer.Option(None, "--tz", help="POSIX TZ string."),
-    utc: Optional[str] = typer.Option(None, "--utc", help="UTC datetime (YYYY-MM-DDTHH:MM:SSZ). Only used if --ntp not set."),
+    timezone: str | None = typer.Option(None, "--tz", help="POSIX TZ string."),
+    utc: str | None = typer.Option(
+        None, "--utc", help="UTC datetime (YYYY-MM-DDTHH:MM:SSZ). Only used if --ntp not set."
+    ),
 ) -> None:
     """Set NTP sync and/or timezone and/or a manual UTC datetime."""
     sess = _open_session(host, port, user, password)
@@ -233,7 +236,9 @@ def users_add(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    new_password: str = typer.Option(..., "--new-password", prompt=True, hide_input=True, confirmation_prompt=True),
+    new_password: str = typer.Option(
+        ..., "--new-password", prompt=True, hide_input=True, confirmation_prompt=True
+    ),
     level: _users.UserLevel = typer.Option(_users.UserLevel.USER, "--level"),
 ) -> None:
     sess = _open_session(host, port, user, password)
@@ -257,7 +262,7 @@ def users_delete(
         _users.delete_user(sess, target)
     except ValidationError as e:
         console.print(f"[red]{e}[/]")
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from None
     console.print(f"[green]deleted {target}[/]")
 
 
@@ -268,7 +273,9 @@ def users_passwd(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    new_password: str = typer.Option(..., "--new-password", prompt=True, hide_input=True, confirmation_prompt=True),
+    new_password: str = typer.Option(
+        ..., "--new-password", prompt=True, hide_input=True, confirmation_prompt=True
+    ),
 ) -> None:
     sess = _open_session(host, port, user, password)
     _users.set_user_password(sess, target, new_password)
@@ -297,7 +304,9 @@ def profiles(
     t.add_column("ptz")
     for p in _media.get_profiles(sess):
         venc = p.video_encoder
-        res = f"{venc.resolution.width}x{venc.resolution.height}" if venc and venc.resolution else ""
+        res = (
+            f"{venc.resolution.width}x{venc.resolution.height}" if venc and venc.resolution else ""
+        )
         t.add_row(
             p.token,
             p.name,
@@ -316,7 +325,7 @@ def stream(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile", help="Profile token (default: first)."),
+    profile: str | None = typer.Option(None, "--profile", help="Profile token (default: first)."),
     with_creds: bool = typer.Option(False, "--with-creds", help="Inline user:pass into the URI."),
 ) -> None:
     """Print the RTSP stream URI for a profile."""
@@ -338,7 +347,7 @@ def preview(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     """Open a live preview window via ffplay."""
     sess = _open_session(host, port, user, password)
@@ -352,7 +361,7 @@ def preview(
         proc = _preview.spawn_ffplay(uri, title=f"{host} - {p.name}")
     except _preview.PreviewNotAvailable as e:
         console.print(f"[red]{e}[/]")
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from None
     console.print(f"[green]ffplay pid {proc.pid}[/] - close the window to exit")
     proc.wait()
 
@@ -364,7 +373,7 @@ def snapshot(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     """Fetch a single JPEG snapshot."""
     sess = _open_session(host, port, user, password)
@@ -384,7 +393,7 @@ def snapshot(
 # -------------------- PTZ --------------------
 
 
-def _require_ptz_profile(sess: DeviceSession, profile: Optional[str]) -> str:
+def _require_ptz_profile(sess: DeviceSession, profile: str | None) -> str:
     profs = _media.get_profiles(sess)
     ptz_profs = [p for p in profs if p.ptz_token]
     if not ptz_profs:
@@ -400,7 +409,7 @@ def ptz_status(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     sess = _open_session(host, port, user, password)
     tok = _require_ptz_profile(sess, profile)
@@ -422,8 +431,8 @@ def ptz_move(
     pan: float = typer.Option(0.0, "--pan", help="Pan speed -1.0..1.0"),
     tilt: float = typer.Option(0.0, "--tilt", help="Tilt speed -1.0..1.0"),
     zoom: float = typer.Option(0.0, "--zoom", help="Zoom speed -1.0..1.0"),
-    duration: Optional[float] = typer.Option(None, "--duration", help="Seconds, then auto-stop."),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    duration: float | None = typer.Option(None, "--duration", help="Seconds, then auto-stop."),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     """Continuous move. Non-zero velocity + optional duration, then stop."""
     sess = _open_session(host, port, user, password)
@@ -437,7 +446,7 @@ def ptz_stop(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     sess = _open_session(host, port, user, password)
     tok = _require_ptz_profile(sess, profile)
@@ -450,7 +459,7 @@ def ptz_presets(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     sess = _open_session(host, port, user, password)
     tok = _require_ptz_profile(sess, profile)
@@ -469,7 +478,7 @@ def ptz_goto(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     sess = _open_session(host, port, user, password)
     tok = _require_ptz_profile(sess, profile)
@@ -483,7 +492,7 @@ def ptz_set_preset(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     sess = _open_session(host, port, user, password)
     tok = _require_ptz_profile(sess, profile)
@@ -498,7 +507,7 @@ def ptz_remove_preset(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    profile: Optional[str] = typer.Option(None, "--profile"),
+    profile: str | None = typer.Option(None, "--profile"),
 ) -> None:
     sess = _open_session(host, port, user, password)
     tok = _require_ptz_profile(sess, profile)
@@ -541,7 +550,9 @@ def _print_state(state: NetworkState) -> None:
         f"search=[{', '.join(state.dns.search_domains)}]",
     )
     if state.ntp:
-        t.add_row("ntp", f"fromDHCP={state.ntp.from_dhcp}  servers=[{', '.join(state.ntp.servers)}]")
+        t.add_row(
+            "ntp", f"fromDHCP={state.ntp.from_dhcp}  servers=[{', '.join(state.ntp.servers)}]"
+        )
     for p in state.protocols:
         t.add_row(f"proto:{p.name.value.lower()}", f"enabled={p.enabled}  ports={list(p.port)}")
     if state.zero_config:
@@ -561,23 +572,25 @@ def apply(
     port: int = typer.Option(80, "--port"),
     user: str = typer.Option(..., "--user", "-u", prompt=True),
     password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    dhcp: Optional[bool] = typer.Option(None, "--dhcp/--no-dhcp"),
-    ip: Optional[str] = typer.Option(None, "--ip"),
-    subnet: Optional[str] = typer.Option(None, "--subnet"),
+    dhcp: bool | None = typer.Option(None, "--dhcp/--no-dhcp"),
+    ip: str | None = typer.Option(None, "--ip"),
+    subnet: str | None = typer.Option(None, "--subnet"),
     gateway: list[str] = typer.Option(None, "--gateway"),
     dns: list[str] = typer.Option(None, "--dns"),
     ntp: list[str] = typer.Option(None, "--ntp"),
-    hostname: Optional[str] = typer.Option(None, "--hostname"),
-    hostname_from_dhcp: Optional[bool] = typer.Option(None, "--hostname-from-dhcp/--no-hostname-from-dhcp"),
-    http: Optional[int] = typer.Option(None, "--http"),
-    http_enabled: Optional[bool] = typer.Option(None, "--http-enabled/--no-http"),
-    https: Optional[int] = typer.Option(None, "--https"),
-    https_enabled: Optional[bool] = typer.Option(None, "--https-enabled/--no-https"),
-    rtsp: Optional[int] = typer.Option(None, "--rtsp"),
-    rtsp_enabled: Optional[bool] = typer.Option(None, "--rtsp-enabled/--no-rtsp"),
-    zero_config: Optional[bool] = typer.Option(None, "--zero-config/--no-zero-config"),
-    discovery_mode: Optional[DiscoveryMode] = typer.Option(None, "--discovery-mode"),
-    client_ip: Optional[str] = typer.Option(None, "--client-ip"),
+    hostname: str | None = typer.Option(None, "--hostname"),
+    hostname_from_dhcp: bool | None = typer.Option(
+        None, "--hostname-from-dhcp/--no-hostname-from-dhcp"
+    ),
+    http: int | None = typer.Option(None, "--http"),
+    http_enabled: bool | None = typer.Option(None, "--http-enabled/--no-http"),
+    https: int | None = typer.Option(None, "--https"),
+    https_enabled: bool | None = typer.Option(None, "--https-enabled/--no-https"),
+    rtsp: int | None = typer.Option(None, "--rtsp"),
+    rtsp_enabled: bool | None = typer.Option(None, "--rtsp-enabled/--no-rtsp"),
+    zero_config: bool | None = typer.Option(None, "--zero-config/--no-zero-config"),
+    discovery_mode: DiscoveryMode | None = typer.Option(None, "--discovery-mode"),
+    client_ip: str | None = typer.Option(None, "--client-ip"),
     yes: bool = typer.Option(False, "--yes", "-y"),
     reboot_wait: float = typer.Option(90.0, "--reboot-wait"),
 ) -> None:
@@ -614,7 +627,7 @@ def apply(
         warnings = _validate(state, patch, client_ip=IPv4Address(client_ip) if client_ip else None)
     except ValidationError as e:
         console.print(f"[red]validation failed:[/] {e}")
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from None
 
     _print_diff(state, patch, diff)
     for w in warnings:
@@ -628,7 +641,7 @@ def apply(
         result = _apply(sess, state, patch, new_host_port=port, reboot_wait_s=reboot_wait)
     except OnvifcfgError as e:
         console.print(f"[red]apply failed:[/] {e}")
-        raise typer.Exit(code=3)
+        raise typer.Exit(code=3) from None
 
     if result.reboot_issued:
         if result.reconnected:
@@ -685,14 +698,38 @@ def _print_diff(state: NetworkState, patch: NetworkPatch, diff) -> None:  # type
     for proto in diff.protocols_changed:
         cur = next((p for p in state.protocols if p.name == proto), None)
         if proto == ProtocolName.HTTP:
-            new_enabled = patch.http_enabled if patch.http_enabled is not None else (cur.enabled if cur else False)
-            new_port = patch.http_port if patch.http_port is not None else (cur.port[0] if cur and cur.port else None)
+            new_enabled = (
+                patch.http_enabled
+                if patch.http_enabled is not None
+                else (cur.enabled if cur else False)
+            )
+            new_port = (
+                patch.http_port
+                if patch.http_port is not None
+                else (cur.port[0] if cur and cur.port else None)
+            )
         elif proto == ProtocolName.HTTPS:
-            new_enabled = patch.https_enabled if patch.https_enabled is not None else (cur.enabled if cur else False)
-            new_port = patch.https_port if patch.https_port is not None else (cur.port[0] if cur and cur.port else None)
+            new_enabled = (
+                patch.https_enabled
+                if patch.https_enabled is not None
+                else (cur.enabled if cur else False)
+            )
+            new_port = (
+                patch.https_port
+                if patch.https_port is not None
+                else (cur.port[0] if cur and cur.port else None)
+            )
         else:
-            new_enabled = patch.rtsp_enabled if patch.rtsp_enabled is not None else (cur.enabled if cur else False)
-            new_port = patch.rtsp_port if patch.rtsp_port is not None else (cur.port[0] if cur and cur.port else None)
+            new_enabled = (
+                patch.rtsp_enabled
+                if patch.rtsp_enabled is not None
+                else (cur.enabled if cur else False)
+            )
+            new_port = (
+                patch.rtsp_port
+                if patch.rtsp_port is not None
+                else (cur.port[0] if cur and cur.port else None)
+            )
         t.add_row(
             f"proto:{proto.value.lower()}",
             f"enabled={cur.enabled if cur else False} port={cur.port[0] if cur and cur.port else None}",
