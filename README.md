@@ -50,6 +50,29 @@ during the code review baked in from day one.
 See [docs/RELIABILITY_FIXES.md](docs/RELIABILITY_FIXES.md) for the full
 catalogue of issues fixed relative to upstream ODM's behaviour.
 
+## Roadmap highlights — essential future addons
+
+Tracked in full in [docs/ROADMAP.md](docs/ROADMAP.md). The headline items:
+
+- **Live preview in the web UI** (Phase 4) — server-side ffmpeg→HLS
+  transcode, with an MJPEG-via-snapshot fallback for low-bandwidth
+  clients.
+- **PTZ control** (Phase 5) — continuous / relative / absolute moves
+  plus presets and a virtual joystick on the device page.
+- **Events, analytics, metadata** (Phase 6) — pull-point subscription
+  loop and event-type filtering.
+- **Certificates + 802.1X + IP filter** (Phase 7) — TLS material
+  upload and allow/deny list editing.
+- **Vendor adapters** (Phase 8) — Hikvision **ISAPI**, Dahua **CGI**,
+  Axis **VAPIX** as additive backends behind ONVIF. First win:
+  reliable snapshots on HIK firmwares where ONVIF + HTTP share a
+  single TCP port and `GetSnapshotUri` is unreliable.
+- **Cross-subnet discovery** — unicast Probe sweep + ARP-OUI sniff +
+  temporary secondary-IP helper, so cameras shipped on the default
+  `192.168.1.0/24` are findable from any subnet.
+- **Multi-NIC / IPv6 UI**, **auth-scheme fallback ladder**, and
+  **WSDL refresh** carried from the upstream review.
+
 ## Install
 
 ```bash

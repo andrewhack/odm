@@ -120,6 +120,68 @@ Lower priority; most users don't configure these interactively.
 - **IP filter** — read/write `GetIPAddressFilter` /
   `SetIPAddressFilter` (allow/deny lists)
 
+## Phase 8 — vendor adapters (HIK / Dahua / Axis)
+
+Most cameras expose ONVIF as a secondary, lowest-common-denominator
+surface; their full feature set lives behind a vendor-proprietary HTTP
+API (Hikvision **ISAPI**, Dahua **CGI**, Axis **VAPIX**). A vendor
+adapter layer keeps ONVIF as the default but lets us route to the
+native API where it does a better or more reliable job.
+
+Architecture:
+
+```
+src/onvifcfg/vendors/
+  __init__.py    # registry + auto-detect at session open
+  hik.py         # Hikvision ISAPI client (httpx + digest)
+  dahua.py       # Dahua CGI client
+  axis.py        # Axis VAPIX client
+```
+
+Auto-detect probes `GET /ISAPI/System/deviceInfo` (HIK), `GET
+/cgi-bin/magicBox.cgi?action=getSystemInfo` (Dahua), `GET
+/axis-cgi/basicdeviceinfo.cgi` (Axis). On match, the session is
+flagged with the vendor; otherwise it stays pure ONVIF. The adapter
+is **additive** — never replaces ONVIF, only augments. ONVIF failure
+still falls back to the standard path.
+
+Highest-value wins per vendor:
+
+- **HIK ISAPI**:
+  - Reliable snapshot via `/ISAPI/Streaming/channels/<ch>01/picture`
+    — bypasses the shared HTTP+ONVIF port collision that breaks
+    `GetSnapshotUri` on some firmwares (the 192.168.5.57 class).
+  - Firmware upgrade via `PUT /ISAPI/System/updateFirmware` —
+    covers the Phase 2 follow-up cleanly; ONVIF firmware upgrade is
+    patchy across vendors.
+  - Smart events (line-crossing, intrusion zones, motion grids) that
+    HIK does not surface over ONVIF.
+  - Imaging (WDR / BLC / day-night) richer than ONVIF imaging.
+- **Dahua CGI**: same shape — snapshot, smart events, imaging,
+  storage management.
+- **Axis VAPIX**: parameter list (`/axis-cgi/param.cgi`), event
+  declarations, the action engine.
+
+Stays ONVIF-only:
+
+- Discovery (WS-Discovery is universal; SADP/Dahua-discover are
+  chatty and vendor-specific).
+- Network configuration (ONVIF `SetNetworkInterfaces` works on every
+  vendor; no reason to reinvent).
+- Stream URI (vendor ONVIF stacks all return the right RTSP URL).
+
+Phasing:
+
+1. Vendor detection + HIK ISAPI snapshot (kills the 5.57 class of
+   bugs).
+2. HIK firmware upgrade (closes the Phase 2 follow-up).
+3. HIK smart events read-only display.
+4. Dahua CGI parity for snapshot + firmware.
+5. Imaging write surfaces per vendor.
+
+Test fixtures use recorded XML / JSON responses; no live camera
+required for unit tests.
+
 ## Cross-cutting enhancements
 
 - **Cross-subnet discovery** — most ONVIF cameras ship with a default IP
