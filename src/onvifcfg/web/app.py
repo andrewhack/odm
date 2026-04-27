@@ -403,7 +403,20 @@ def create_app() -> FastAPI:
                     else:
                         src_opener = urllib.request
                     with src_opener.open(uri, timeout=6) as r:
+                        ctype = r.headers.get("Content-Type", "?")
                         data = r.read()
+                    # Some cameras share HTTP+ONVIF on the same port and route
+                    # the snapshot path back to their SOAP/admin handler, so a
+                    # 200 response can carry HTML or XML instead of a JPEG.
+                    # Validate the JPEG magic before trusting it; on mismatch
+                    # log what we actually got and fall through to ffmpeg.
+                    if not (len(data) >= 3 and data[0] == 0xFF and data[1] == 0xD8):
+                        head = data[:16].hex(" ")
+                        attempts.append(
+                            f"{label}/{mode}: not-jpeg from {uri} "
+                            f"(ct={ctype!r} len={len(data)} head={head})"
+                        )
+                        break
                     _creds.remember(host, user, password)
                     return Response(
                         content=data,
