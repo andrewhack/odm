@@ -39,19 +39,25 @@ POST `/action/reboot` and POST `/action/factory-reset` routes.
   non-empty admin on delete, validate password complexity where the device
   advertises a security policy
 
-## Phase 2 follow-ups — pending
+## Phase 2 follow-ups — DONE
 
-Backend modules are in place (`users.py`, `device_info.get_system_date_and_time`)
-but no dedicated UI page yet; these are small follow-up tickets rather
-than blockers on Phase 3:
+Shipped in v0.1.2:
 
-- **Time settings UI** — form on `/device` to set timezone / NTP-sync
-  flag / manual UTC; wraps `SetSystemDateAndTime`.
-- **Users UI** — table of users, add/delete/change-password buttons
-  wired to the existing `users` module.
-- **Firmware upgrade** — `UpgradeSystemFirmware` with MTOM/HTTP
-  fallback (fix #18 from the review: binary payload handling varies
-  by firmware).
+- **Time settings UI** — `/device` panel reads UTC / local / TZ /
+  NTP-sync / DST and exposes a form posting to `/action/set-time`,
+  wrapping `SetSystemDateAndTime` (NTP toggle, POSIX TZ string,
+  manual UTC override).
+- **Users UI** — `/device` table of users with per-row password +
+  delete actions and an "add user" form, posting to
+  `/action/user-create`, `/action/user-delete`,
+  `/action/user-password`. Last-administrator deletion guard from
+  the backend is preserved.
+- **Firmware upgrade** — `/action/firmware-upgrade` accepts a
+  `multipart/form-data` upload, tries `StartFirmwareUpgrade` HTTP
+  upload first, falls back to inline base64 `UpgradeSystemFirmware`
+  (fix #18 from the upstream review: zeep does not implement MTOM,
+  binary payload handling varies by firmware). Reachability probe
+  waits up to 180 s for the device to come back.
 
 ## Phase 3 — media plane read / edit
 ### Phase 3 — in progress

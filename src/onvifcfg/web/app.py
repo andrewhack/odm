@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from .. import credentials_cache as _creds
 from .. import device_info as _dev
 from .. import media as _media
+from .. import users as _users
 from ..discovery import discover as _discover
 from ..exceptions import OnvifcfgError, ValidationError
 from ..models import DiscoveryMode, NetworkPatch
@@ -59,6 +60,28 @@ def _safe_profiles(sess: DeviceSession) -> list[Any]:
         import logging
 
         logging.getLogger("onvifcfg.profiles").info("get_profiles failed: %s", e)
+        return []
+
+
+def _safe_system_time(sess: DeviceSession) -> Any | None:
+    """Phase 2 follow-up: read current system time for the time-settings panel."""
+    try:
+        return _dev.get_system_time(sess)
+    except Exception as e:
+        import logging
+
+        logging.getLogger("onvifcfg.system_time").info("get_system_time failed: %s", e)
+        return None
+
+
+def _safe_users(sess: DeviceSession) -> list[Any]:
+    """Phase 2 follow-up: read user list for the users panel."""
+    try:
+        return list(_users.get_users(sess))
+    except Exception as e:
+        import logging
+
+        logging.getLogger("onvifcfg.users").info("get_users failed: %s", e)
         return []
 
 
@@ -115,6 +138,8 @@ def create_app() -> FastAPI:
             _creds.remember(host, user, password)
             info = _dev.get_device_info(sess) if _dev else None
             profiles = _safe_profiles(sess)
+            system_time = _safe_system_time(sess)
+            user_list = _safe_users(sess)
             return templates.TemplateResponse(
                 request=request,
                 name="device.html",
@@ -127,6 +152,8 @@ def create_app() -> FastAPI:
                     "state": state,
                     "info": info,
                     "profiles": profiles,
+                    "system_time": system_time,
+                    "user_list": user_list,
                     "auto_login_note": f"auto-logged in as '{user or '(anonymous)'}'",
                 },
             )
@@ -177,6 +204,8 @@ def create_app() -> FastAPI:
         _creds.remember(host, user, password)
         info = _dev.get_device_info(sess) if _dev else None
         profiles = _safe_profiles(sess)
+        system_time = _safe_system_time(sess)
+        user_list = _safe_users(sess)
         return templates.TemplateResponse(
             request=request,
             name="device.html",
@@ -189,6 +218,8 @@ def create_app() -> FastAPI:
                 "state": state,
                 "info": info,
                 "profiles": profiles,
+                "system_time": system_time,
+                "user_list": user_list,
             },
         )
 
@@ -660,6 +691,198 @@ def create_app() -> FastAPI:
                 "host": host,
                 "port": port,
                 "result_msg": f"factory reset requested ({m.value})",
+            },
+        )
+
+    # ---------- Phase 2 follow-ups: time / users / firmware ----------
+
+    @app.post("/action/set-time", response_class=HTMLResponse)
+    def action_set_time(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        use_ntp: str = Form(""),
+        timezone: str = Form(""),
+        utc_datetime: str = Form(""),
+    ) -> Any:
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            _dev.set_system_time(
+                sess,
+                use_ntp=(use_ntp in ("on", "true", "1", "yes")),
+                timezone=(timezone or None),
+                utc_datetime=(utc_datetime or None),
+            )
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"set system time failed: {e}",
+                },
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": (
+                    "system time updated"
+                    + (f" (TZ={timezone})" if timezone else "")
+                    + (" - NTP sync enabled" if use_ntp else "")
+                ),
+            },
+        )
+
+    @app.post("/action/user-create", response_class=HTMLResponse)
+    def action_user_create(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        new_username: str = Form(...),
+        new_password: str = Form(...),
+        new_level: str = Form("User"),
+    ) -> Any:
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            level = _users.UserLevel(new_level)
+            _users.create_user(sess, new_username, new_password, level=level)
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"create user failed: {e}",
+                },
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": f"user {new_username!r} created with level {new_level}",
+            },
+        )
+
+    @app.post("/action/user-delete", response_class=HTMLResponse)
+    def action_user_delete(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        target_username: str = Form(...),
+    ) -> Any:
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            _users.delete_user(sess, target_username)
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"delete user failed: {e}",
+                },
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": f"user {target_username!r} deleted",
+            },
+        )
+
+    @app.post("/action/user-password", response_class=HTMLResponse)
+    def action_user_password(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        target_username: str = Form(...),
+        new_password: str = Form(...),
+    ) -> Any:
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            _users.set_user_password(sess, target_username, new_password)
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"set password failed: {e}",
+                },
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": f"password for {target_username!r} updated",
+            },
+        )
+
+    @app.post("/action/firmware-upgrade", response_class=HTMLResponse)
+    async def action_firmware_upgrade(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        firmware: UploadFile = File(...),
+    ) -> Any:
+        from .. import maintenance as _maint
+
+        try:
+            data = await firmware.read()
+            if not data:
+                raise OnvifcfgError("uploaded file is empty")
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            result = _maint.firmware_upgrade(sess, data, user=user, password=password, wait_s=180.0)
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"firmware upgrade failed: {e}",
+                },
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": f"[{result.method}] {result.message}",
             },
         )
 

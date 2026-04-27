@@ -60,7 +60,7 @@ class TestPortValidation:
 
     def test_rejects_duplicate_ports(self) -> None:
         patch = NetworkPatch(rtsp_port=80)  # collide with HTTP default 80
-        with pytest.raises(ValidationError, match="multiple protocols"):
+        with pytest.raises(ValidationError, match="assigned to both"):
             validate(_state(), patch)
 
     def test_allows_duplicate_port_if_only_one_protocol_enabled(self) -> None:

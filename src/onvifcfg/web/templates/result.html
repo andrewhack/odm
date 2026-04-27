@@ -2,7 +2,11 @@
 {% block title %}onvifcfg — result{% endblock %}
 {% block content %}
 
-{% if no_change %}
+{% if error %}
+  <div class="warn">{{ error }}</div>
+{% elif result_msg %}
+  <div class="ok">{{ result_msg }}</div>
+{% elif no_change %}
   <div class="ok">no effective changes - nothing to apply.</div>
 {% elif result %}
   {% if result.reboot_issued %}
