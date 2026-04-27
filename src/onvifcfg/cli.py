@@ -34,9 +34,11 @@ app = typer.Typer(
 ptz_app = typer.Typer(no_args_is_help=True, help="PTZ control.")
 users_app = typer.Typer(no_args_is_help=True, help="User management.")
 time_app = typer.Typer(no_args_is_help=True, help="System time.")
+encoder_app = typer.Typer(no_args_is_help=True, help="Video encoder configuration.")
 app.add_typer(ptz_app, name="ptz")
 app.add_typer(users_app, name="users")
 app.add_typer(time_app, name="time")
+app.add_typer(encoder_app, name="encoder")
 
 console = Console()
 
@@ -389,6 +391,116 @@ def snapshot(
         raise typer.Exit(code=2)
     _preview.save_snapshot(uri, output, user=user, password=password)
     console.print(f"[green]saved {output}[/]")
+
+
+# -------------------- video encoder --------------------
+
+
+@encoder_app.command("show")
+def encoder_show(
+    host: str = typer.Argument(...),
+    port: int = typer.Option(80, "--port"),
+    user: str = typer.Option(..., "--user", "-u", prompt=True),
+    password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
+    profile: str | None = typer.Option(None, "--profile", help="Profile token (default: first)."),
+) -> None:
+    """Print the option space the encoder advertises for a profile."""
+    sess = _open_session(host, port, user, password)
+    profs = _media.get_profiles(sess)
+    p = next((x for x in profs if x.token == profile), profs[0] if profs else None)
+    if p is None or not p.encoder_config_token:
+        console.print("[red]no profile with an encoder configuration[/]")
+        raise typer.Exit(code=1)
+    opts = _media.get_encoder_options(sess, p.encoder_config_token, p.token)
+    if opts is None:
+        console.print("[red]device refused GetVideoEncoderConfigurationOptions[/]")
+        raise typer.Exit(code=2)
+    t = Table(title=f"encoder options for profile {p.name} ({opts.encoding})")
+    t.add_column("field")
+    t.add_column("choices")
+    t.add_row("config token", opts.token)
+    t.add_row(
+        "resolutions", ", ".join(f"{r.width}x{r.height}" for r in opts.resolutions) or "(none)"
+    )
+    t.add_row("fps", ", ".join(str(f) for f in opts.fps_choices) or "(none)")
+    t.add_row(
+        "bitrate kbps",
+        f"{opts.bitrate_range_kbps[0]}-{opts.bitrate_range_kbps[1]}"
+        if opts.bitrate_range_kbps
+        else "(unspecified)",
+    )
+    t.add_row(
+        "gov length",
+        f"{opts.gov_length_range[0]}-{opts.gov_length_range[1]}"
+        if opts.gov_length_range
+        else "(unspecified)",
+    )
+    console.print(t)
+
+
+@encoder_app.command("set")
+def encoder_set(
+    host: str = typer.Argument(...),
+    port: int = typer.Option(80, "--port"),
+    user: str = typer.Option(..., "--user", "-u", prompt=True),
+    password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
+    profile: str | None = typer.Option(None, "--profile", help="Profile token (default: first)."),
+    config_token: str | None = typer.Option(
+        None, "--config-token", help="Override config token (default: from profile)."
+    ),
+    resolution: str | None = typer.Option(
+        None, "--resolution", help="WxH e.g. 1920x1080. Must be one the device advertises."
+    ),
+    fps: int | None = typer.Option(None, "--fps"),
+    bitrate: int | None = typer.Option(None, "--bitrate", help="kbps"),
+    gov: int | None = typer.Option(None, "--gov", help="GOP length / GovLength"),
+    yes: bool = typer.Option(False, "--yes", "-y"),
+) -> None:
+    """Update one or more encoder fields on a profile."""
+    sess = _open_session(host, port, user, password)
+    profs = _media.get_profiles(sess)
+    p = next((x for x in profs if x.token == profile), profs[0] if profs else None)
+    if p is None:
+        console.print("[red]no profiles[/]")
+        raise typer.Exit(code=1)
+    token = config_token or p.encoder_config_token
+    if not token:
+        console.print(f"[red]no encoder config token on profile {p.token!r}[/]")
+        raise typer.Exit(code=1)
+    res_obj = None
+    if resolution:
+        try:
+            w, h = resolution.lower().split("x", 1)
+            res_obj = _media.Resolution(int(w), int(h))
+        except (ValueError, AttributeError) as e:
+            console.print(f"[red]bad --resolution {resolution!r}: {e}[/]")
+            raise typer.Exit(code=2) from None
+    summary = ", ".join(
+        f"{k}={v}"
+        for k, v in {
+            "resolution": resolution,
+            "fps": fps,
+            "bitrate": bitrate,
+            "gov": gov,
+        }.items()
+        if v is not None
+    )
+    if not summary:
+        console.print("[yellow]nothing to apply (no fields supplied)[/]")
+        raise typer.Exit(code=1)
+    if not yes and not Confirm.ask(
+        f"apply encoder changes ({summary}) to {p.name}?", default=False
+    ):
+        raise typer.Exit(code=1)
+    _media.set_video_encoder_configuration(
+        sess,
+        token,
+        resolution=res_obj,
+        fps=fps,
+        bitrate_kbps=bitrate,
+        gov_length=gov,
+    )
+    console.print(f"[green]encoder {token} updated ({summary})[/]")
 
 
 # -------------------- PTZ --------------------

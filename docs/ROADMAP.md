@@ -60,24 +60,46 @@ Shipped in v0.1.2:
   waits up to 180 s for the device to come back.
 
 ## Phase 3 — media plane read / edit
-### Phase 3 — in progress
 
-- v0.1.x: read-only profile table on `/device` (name / token /
-  encoding / resolution / fps / bitrate), one RTSP link per
-  profile, `get_encoder_options` helper in place for the edit
-  form landing next.
+### Shipped in v0.1.x
 
+- Read-only profile table on `/device` (name / token / encoding /
+  resolution / fps / bitrate / GOV) with one RTSP link per profile.
+- `get_encoder_options` helper exposing the device-advertised
+  resolutions / fps range / bitrate range / GOV-length range per
+  encoder configuration.
 
-- **Profiles** — `GetProfiles`, add/delete, rename
+### Shipped in v0.1.4 — video encoder edit
+
+- **Setter backend**: `media.set_video_encoder_configuration()` reads
+  the existing config first and patches only the fields the caller
+  supplied (round-trips Name / UseCount / Multicast / Quality so
+  HIK and Dahua firmwares that fault on a partially-populated
+  configuration accept the write).
+- **Web UI**: per-profile edit form on `/device` posting to
+  `POST /action/encoder-set`, with resolution / fps populated from
+  the option space and bitrate / GOV-length validated against the
+  range advertised by the device.
+- **CLI**: `onvifcfg encoder show` prints the option space;
+  `onvifcfg encoder set --resolution WxH --fps N --bitrate K --gov G`
+  applies a delta in one shot.
+- **Tests**: 5 round-trip tests in `tests/test_media_encoder.py`
+  cover the most common firmware regressions (resolution-only
+  patch preserves Encoding / Name, fps + bitrate route to
+  RateControl, GOV-length routes to the H264 sub-block, force-
+  persistence override, hard-fail when the device refuses
+  GetVideoEncoderConfiguration).
+
+### Phase 3 follow-ups
+
+- **Profiles** — `GetProfiles`, add / delete, rename.
 - **Video sources** — `GetVideoSources`, `GetVideoSourceConfigurations`,
-  `SetVideoSourceConfiguration`
-- **Video encoder** — `GetVideoEncoderConfigurations`,
-  `SetVideoEncoderConfiguration` (resolution, bitrate, GOP, H264/H265
-  profile)
-- **Audio encoder** — same pattern
-- **Imaging** — `GetImagingSettings`, `SetImagingSettings` (brightness,
-  contrast, saturation, sharpness, WDR, backlight, focus)
-- **Stream URIs** — `GetStreamUri` per profile (RTSP, unicast, TCP preferred)
+  `SetVideoSourceConfiguration`.
+- **Audio encoder** — same setter pattern as video encoder.
+- **Imaging** — `GetImagingSettings`, `SetImagingSettings`
+  (brightness, contrast, saturation, sharpness, WDR, backlight, focus).
+- **Stream URIs** — extend `GetStreamUri` to surface RTSP-over-HTTP
+  + multicast variants alongside the default unicast TCP URI.
 
 ## Phase 4 — live video preview
 

@@ -268,7 +268,7 @@
 <h3 style="margin-top:2em">media profiles</h3>
 <table>
   <thead>
-    <tr><th>name</th><th>token</th><th>encoder</th><th>resolution</th><th>fps</th><th>bitrate</th><th></th></tr>
+    <tr><th>name</th><th>token</th><th>encoder</th><th>resolution</th><th>fps</th><th>bitrate</th><th>gov</th><th></th></tr>
   </thead>
   <tbody>
   {% for p in profiles %}
@@ -287,12 +287,73 @@
           {{ p.video_encoder.bitrate_kbps }} kbps
         {%- else -%}-{%- endif -%}
       </td>
+      <td>{{ p.encoder_gov_length if p.encoder_gov_length else "-" }}</td>
       <td><a href="/rtsp/{{ host }}?port={{ port }}&amp;profile={{ p.token }}">rtsp</a></td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
-<p class="muted">Read-only view for now; video-encoder edit form lands in the next Phase 3 step.</p>
+
+<h3 style="margin-top:1.5em">video encoder edit</h3>
+{% set any_editable = false %}
+{% for p in profiles %}{% if p.encoder_config_token and encoder_options and encoder_options.get(p.token) %}{% set any_editable = true %}{% endif %}{% endfor %}
+{% if not any_editable %}
+<p class="muted">No editable encoders. Either the device did not return a configuration token per profile, or it refused <code>GetVideoEncoderConfigurationOptions</code>.</p>
+{% endif %}
+{% for p in profiles %}
+  {% set opts = encoder_options.get(p.token) if encoder_options else none %}
+  {% if p.encoder_config_token and opts %}
+  <fieldset style="margin-bottom:1em">
+    <legend><strong>{{ p.name }}</strong> <span class="muted">(profile <code>{{ p.token }}</code> &rarr; config <code>{{ p.encoder_config_token }}</code>, {{ opts.encoding }})</span></legend>
+    <form method="post" action="/action/encoder-set"
+          onsubmit="return confirm('Apply encoder changes to {{ p.name }}? The stream will reconnect.')">
+      <input type="hidden" name="host" value="{{ host }}">
+      <input type="hidden" name="port" value="{{ port }}">
+      <input type="hidden" name="user" value="{{ user }}">
+      <input type="hidden" name="password" value="{{ password }}">
+      <input type="hidden" name="config_token" value="{{ p.encoder_config_token }}">
+      <input type="hidden" name="profile_token" value="{{ p.token }}">
+      <input type="hidden" name="encoding" value="{{ opts.encoding }}">
+      <div class="row"><label>resolution</label>
+        <select name="resolution">
+          <option value="">(no change)</option>
+          {% for r in opts.resolutions %}
+            {% set sel = p.video_encoder and p.video_encoder.resolution and p.video_encoder.resolution.width == r.width and p.video_encoder.resolution.height == r.height %}
+            <option value="{{ r.width }}x{{ r.height }}"{% if sel %} selected{% endif %}>{{ r.width }}&times;{{ r.height }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="row"><label>fps</label>
+        {% if opts.fps_choices %}
+        <select name="fps">
+          <option value="">(no change)</option>
+          {% for f in opts.fps_choices %}
+            <option value="{{ f }}"{% if p.video_encoder and p.video_encoder.fps == f %} selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="number" name="fps" min="1" max="120" value="{{ p.video_encoder.fps if p.video_encoder and p.video_encoder.fps else '' }}" placeholder="(no change)">
+        {% endif %}
+      </div>
+      <div class="row"><label>bitrate (kbps)</label>
+        <input type="number" name="bitrate_kbps"
+               {% if opts.bitrate_range_kbps %}min="{{ opts.bitrate_range_kbps[0] }}" max="{{ opts.bitrate_range_kbps[1] }}"{% endif %}
+               value="{{ p.video_encoder.bitrate_kbps if p.video_encoder and p.video_encoder.bitrate_kbps else '' }}"
+               placeholder="(no change)">
+        {% if opts.bitrate_range_kbps %}<span class="muted">range {{ opts.bitrate_range_kbps[0] }}-{{ opts.bitrate_range_kbps[1] }}</span>{% endif %}
+      </div>
+      <div class="row"><label>GOV length</label>
+        <input type="number" name="gov_length"
+               {% if opts.gov_length_range %}min="{{ opts.gov_length_range[0] }}" max="{{ opts.gov_length_range[1] }}"{% endif %}
+               value="{{ p.encoder_gov_length if p.encoder_gov_length else '' }}"
+               placeholder="(no change)">
+        {% if opts.gov_length_range %}<span class="muted">range {{ opts.gov_length_range[0] }}-{{ opts.gov_length_range[1] }}</span>{% endif %}
+      </div>
+      <button type="submit" class="secondary">apply encoder changes</button>
+    </form>
+  </fieldset>
+  {% endif %}
+{% endfor %}
 {% endif %}
 
 {% endblock %}

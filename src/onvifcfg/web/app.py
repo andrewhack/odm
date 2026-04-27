@@ -63,6 +63,31 @@ def _safe_profiles(sess: DeviceSession) -> list[Any]:
         return []
 
 
+def _safe_encoder_options(sess: DeviceSession, profiles: list[Any]) -> dict[str, Any]:
+    """Phase 3 edit form: per-profile EncoderOptions, keyed by profile token.
+
+    Returns an empty mapping if the device refuses
+    GetVideoEncoderConfigurationOptions or if no profile carries an
+    encoder config.  The render path always treats this as best-effort.
+    """
+    out: dict[str, Any] = {}
+    for p in profiles:
+        if not p.encoder_config_token:
+            continue
+        try:
+            opts = _media.get_encoder_options(sess, p.encoder_config_token, p.token)
+        except Exception as e:
+            import logging
+
+            logging.getLogger("onvifcfg.encoder_options").info(
+                "get_encoder_options failed for %s: %s", p.token, e
+            )
+            opts = None
+        if opts is not None:
+            out[p.token] = opts
+    return out
+
+
 def _safe_system_time(sess: DeviceSession) -> Any | None:
     """Phase 2 follow-up: read current system time for the time-settings panel."""
     try:
@@ -138,6 +163,7 @@ def create_app() -> FastAPI:
             _creds.remember(host, user, password)
             info = _dev.get_device_info(sess) if _dev else None
             profiles = _safe_profiles(sess)
+            encoder_options = _safe_encoder_options(sess, profiles)
             system_time = _safe_system_time(sess)
             user_list = _safe_users(sess)
             return templates.TemplateResponse(
@@ -152,6 +178,7 @@ def create_app() -> FastAPI:
                     "state": state,
                     "info": info,
                     "profiles": profiles,
+                    "encoder_options": encoder_options,
                     "system_time": system_time,
                     "user_list": user_list,
                     "auto_login_note": f"auto-logged in as '{user or '(anonymous)'}'",
@@ -204,6 +231,7 @@ def create_app() -> FastAPI:
         _creds.remember(host, user, password)
         info = _dev.get_device_info(sess) if _dev else None
         profiles = _safe_profiles(sess)
+        encoder_options = _safe_encoder_options(sess, profiles)
         system_time = _safe_system_time(sess)
         user_list = _safe_users(sess)
         return templates.TemplateResponse(
@@ -218,6 +246,7 @@ def create_app() -> FastAPI:
                 "state": state,
                 "info": info,
                 "profiles": profiles,
+                "encoder_options": encoder_options,
                 "system_time": system_time,
                 "user_list": user_list,
             },
@@ -844,6 +873,81 @@ def create_app() -> FastAPI:
                 "host": host,
                 "port": port,
                 "result_msg": f"password for {target_username!r} updated",
+            },
+        )
+
+    @app.post("/action/encoder-set", response_class=HTMLResponse)
+    def action_encoder_set(
+        request: Request,
+        host: str = Form(...),
+        port: int = Form(80),
+        user: str = Form(...),
+        password: str = Form(...),
+        config_token: str = Form(...),
+        profile_token: str = Form(""),
+        encoding: str = Form(""),
+        resolution: str = Form(""),
+        fps: str = Form(""),
+        bitrate_kbps: str = Form(""),
+        gov_length: str = Form(""),
+    ) -> Any:
+        """Apply video encoder configuration changes.
+
+        ``resolution`` is encoded as "WxH" so the form can carry the
+        device-advertised choices through unchanged. Empty fields mean
+        "leave alone" — the underlying setter only patches what was sent.
+        """
+        try:
+            sess = DeviceSession(host, port, Credentials(user=user, password=password))
+            res = None
+            if resolution:
+                w_str, _, h_str = resolution.partition("x")
+                if not w_str or not h_str:
+                    raise ValueError(f"bad resolution {resolution!r}; expected 'WxH'")
+                res = _media.Resolution(int(w_str), int(h_str))
+            _media.set_video_encoder_configuration(
+                sess,
+                config_token,
+                encoding=(encoding or None),
+                resolution=res,
+                fps=(int(fps) if fps else None),
+                bitrate_kbps=(int(bitrate_kbps) if bitrate_kbps else None),
+                gov_length=(int(gov_length) if gov_length else None),
+            )
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="result.html",
+                context={
+                    "request": request,
+                    "host": host,
+                    "port": port,
+                    "error": f"encoder set failed: {e}",
+                },
+            )
+        parts = []
+        if encoding:
+            parts.append(f"encoding={encoding}")
+        if resolution:
+            parts.append(f"resolution={resolution}")
+        if fps:
+            parts.append(f"fps={fps}")
+        if bitrate_kbps:
+            parts.append(f"bitrate={bitrate_kbps}kbps")
+        if gov_length:
+            parts.append(f"gov={gov_length}")
+        return templates.TemplateResponse(
+            request=request,
+            name="result.html",
+            context={
+                "request": request,
+                "host": host,
+                "port": port,
+                "result_msg": (
+                    f"encoder {config_token!r} updated"
+                    + (" (" + ", ".join(parts) + ")" if parts else " (no fields changed)")
+                    + (f" for profile {profile_token!r}" if profile_token else "")
+                ),
             },
         )
 
