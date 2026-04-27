@@ -8,15 +8,27 @@ $sha  = try { (& git -C $repo rev-parse --short=7 HEAD 2>$null).Trim() } catch {
 if (-not $sha) { $sha = 'dev' }
 $ts   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
+# Pull project.version from pyproject.toml so the frozen build matches
+# the release tag without a second source of truth.
+$ver = 'dev'
+$pyproject = Join-Path $repo 'pyproject.toml'
+foreach ($line in Get-Content $pyproject) {
+    if ($line -match '^\s*version\s*=\s*"([^"]+)"') {
+        $ver = $matches[1]
+        break
+    }
+}
+
 $srcFile = Join-Path $repo 'src\onvifcfg\_buildinfo.py'
 $body = @"
 `"""Build-time metadata (regenerated on every build).`"""
 
 GIT_SHA = "$sha"
 BUILD_TIME = "$ts"
+VERSION = "$ver"
 "@
 Set-Content -Path $srcFile -Value $body -Encoding UTF8
-Write-Host "    wrote $srcFile (sha=$sha, time=$ts)"
+Write-Host "    wrote $srcFile (sha=$sha, time=$ts, version=$ver)"
 
 # Belt-and-suspenders: if the project is already installed into a venv
 # (uv sync ran earlier), also overwrite the site-packages copy so the

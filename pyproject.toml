@@ -1,6 +1,6 @@
 [project]
 name = "onvifcfg"
-version = "0.1.2"
+version = "0.1.3"
 description = "ONVIF network configuration CLI tool"
 readme = "README.md"
 license = { file = "LICENSE" }

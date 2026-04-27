@@ -80,6 +80,7 @@ def serve(
     """Launch the local web UI (FastAPI + Jinja)."""
     import uvicorn
 
+    from ._buildinfo import GIT_SHA as _git_sha  # noqa: N811
     from .web.app import create_app
 
     logging.basicConfig(
@@ -87,7 +88,7 @@ def serve(
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
     app_ = create_app()
-    console.print(f"[green]onvifcfg web UI on http://{host}:{port}/[/]")
+    console.print(f"[green]onvifcfg {__version__} ({_git_sha}) web UI on http://{host}:{port}/[/]")
     uvicorn.run(app_, host=host, port=port, log_level="info")
 
 
